@@ -165,7 +165,6 @@ def display_status(trx_status: TrxStatus, trx_supported_values: set, display, wl
     else:
         rx_f = current_rx_frequency / 1000000
         rx_freq_string = f"{rx_f:.6f}"
-        
 
     mode_string = trx_status.mode if trx_status.mode is not "" else NO_VALUE_PLACEHOLDER
     power_string = f"{trx_status.rf_power} W" if trx_status.rf_power else NO_VALUE_PLACEHOLDER
@@ -177,18 +176,12 @@ def display_status(trx_status: TrxStatus, trx_supported_values: set, display, wl
         wlan_human_readable = f"Fair ({wlan_strength})"
     else:
         wlan_human_readable = f"Poor ({wlan_strength})"
-        
-    if last_reported_trx_tx_frequency == current_tx_frequency:
-        api_success_flag = "X"
-    else:
-        api_success_flag = " "
     
     display.fill(0)
     display.text(f'RX f: {rx_freq_string}', 0, 0, 1)
     display.text(f'TX f: {tx_freq_string}', 0, 12, 1)
     display.text(f'Mode: {mode_string}', 0, 24, 1)
     display.text(f'Power: {power_string}', 0, 36, 1)
-    #todo display.text(f'API call OK: ({api_success_flag})', 0, 36, 1)
     display.text(f'Wifi: {wlan_human_readable}', 0, 48, 1)
     display.show()
 
