@@ -13,6 +13,7 @@ class TrxStatus:
         rit_enabled: bool = False,
         xit_enabled: bool = False,
         rit_offset_freq: int = None,
+        rf_power: int = None,
     ):
         self.mode = mode
         self.active_vfo = active_vfo
@@ -23,6 +24,7 @@ class TrxStatus:
         self.rit_enabled = rit_enabled
         self.xit_enabled = xit_enabled
         self.rit_offset_freq = rit_offset_freq
+        self.rf_power = rf_power
         
     def current_tx_frequency(self, status_values_supported_by_trx: set):
         if not status_values_supported_by_trx:

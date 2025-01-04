@@ -1,46 +1,45 @@
 import gc
 import json
 import time
+from machine import UART, Pin, SoftI2C, Timer, reset
 import network
 import ssd1306
-import requests
+import urequests
+# from httpserver import (HTTPResponse, HTTPServer)
 import os
-from micropython import const
-from machine import UART, Pin, SoftI2C, Timer, reset
-from lib.http_server import (HTTPResponse, HTTPServer, STOP_SERVER)
+
+# from multipart_parser import PushMultipartParser, MultipartSegment, MultipartPart
 from omnirig import (
     OmnirigConfigParser,
     OmnirigStatusCommand,
     OmnirigCommandExecutor,
-    OmnirigValueDecoder,
-    TrxStatus,
+    OmnirigValueDecoder, TrxStatus,
 )
 
-gc.collect()  # memory cleanup after imports
+gc.collect()  # cleanup after imports
 
 DEBUG = True # debug mode on/off - will print messages to console
 
-DEVICE_NAME = const("WLTrxInterface")
-CONFIG_FILE_NAME = const("config.json")
-RADIO_DRIVER_FILE_NAME = const("radio_driver.ini")
-SPLASH_SCREEN_WAIT_TIME = const(3)  # seconds
-WIFI_CONNECTED_SCREEN_WAIT_TIME = const(2)  # seconds
-API_HEARTBEAT_TIME = const(20)  # seconds
+DEVICE_NAME = "WLTrxInterface"
+CONFIG_FILE_NAME = "config.json"
+RADIO_DRIVER_FILE_NAME = "radio_driver.ini"
+SPLASH_SCREEN_WAIT_TIME = 3  # seconds
+WIFI_CONNECTED_SCREEN_WAIT_TIME = 2  # seconds
 
-CFG_KEY_WIFI_NAME = const("wifiName")
-CFG_KEY_WIFI_PASS = const("wifiPass")
-CFG_KEY_WAVELOG_API_URL = const("wavelogApiUrl")
-CFG_KEY_WAVELOG_API_KEY = const("wavelogApiKey")
-CFG_KEY_WAVELOG_API_CALL_TIMEOUT = const("wavelogApiCallTimeout")
-CFG_KEY_WAVELOG_API_CALL_INTERVAL= const("wavelogApiCallInterval")
-CFG_KEY_RADIO_NAME = const("radioName")
-CFG_KEY_RADIO_BAUD_RATE = const("radioBaudRate")
-CFG_KEY_RADIO_DATA_BITS = const("radioDataBits")
-CFG_KEY_RADIO_PARITY = const("radioParity")
-CFG_KEY_RADIO_STOP_BITS = const("radioStopBits")
-CFG_KEY_RADIO_REPLY_TIMEOUT = const("radioReplyTimeout")
-CFG_KEY_RADIO_POLLING_INTERVAL = const("radioPollingInterval")
-CFG_KEY_RADIO_DRIVER_NAME = const("radioDriverName")
+CFG_KEY_WIFI_NAME = "wifiName"
+CFG_KEY_WIFI_PASS = "wifiPass"
+CFG_KEY_WAVELOG_API_URL = "wavelogApiUrl"
+CFG_KEY_WAVELOG_API_KEY = "wavelogApiKey"
+CFG_KEY_WAVELOG_API_CALL_TIMEOUT = "wavelogApiCallTimeout"
+CFG_KEY_WAVELOG_API_CALL_INTERVAL= "wavelogApiCallInterval"
+CFG_KEY_RADIO_NAME = "radioName"
+CFG_KEY_RADIO_BAUD_RATE = "radioBaudRate"
+CFG_KEY_RADIO_DATA_BITS = "radioDataBits"
+CFG_KEY_RADIO_PARITY = "radioParity"
+CFG_KEY_RADIO_STOP_BITS = "radioStopBits"
+CFG_KEY_RADIO_REPLY_TIMEOUT = "radioReplyTimeout"
+CFG_KEY_RADIO_POLLING_INTERVAL = "radioPollingInterval"
+CFG_KEY_RADIO_DRIVER_NAME = "radioDriverName"
 
 VALUES_OF_INTEREST = [
     "pmFreq",  # operating frequency
@@ -67,14 +66,12 @@ VALUES_OF_INTEREST = [
     "pmDIG_L",  # Digital mode, lower sideband
     "pmAM",     # AM mode
     "pmFM",     # FM mode
-    "pmRfPower" # RF Output power
 ]
 
-NO_VALUE_PLACEHOLDER = const("---")
+NO_VALUE_PLACEHOLDER = "---"
 
-setup_button_pin = Pin(15, Pin.IN, Pin.PULL_UP)
-api_call_ok_led_pin = Pin(12, Pin.OUT, value=0)
-api_call_not_ok_led_pin = Pin(27, Pin.OUT, value=0)
+
+setup_button = Pin(15, Pin.IN, Pin.PULL_UP)
 
 i2c = SoftI2C(sda=Pin(4), scl=Pin(5))
 display = ssd1306.SSD1306_I2C(128, 64, i2c)
@@ -84,24 +81,20 @@ value_decoder = OmnirigValueDecoder()
 command_executor = OmnirigCommandExecutor(value_decoder=value_decoder, debug=DEBUG)
 
 wifi_station_interface = network.WLAN(network.WLAN.IF_STA)
-wifi_ap_interface = network.WLAN(network.WLAN.IF_AP)
-setup_http_server = HTTPServer(port=80, timeout=5)
+# wifi_ap_interface = network.WLAN(network.WLAN.IF_AP)
+# setup_http_server = HTTPServer(port=80, timeout=5)
 
 commands_to_execute = None
 status_values_supported_by_trx = None
 is_setup_mode_active = False
-force_reboot = False
 cfg = None
-trx_status_read_timer: Timer = None
+# trx_status_read_timer: Timer = None
 trx_status_read_timer_ticked = False
-trx_status_api_call_timer: Timer = None
-trx_status_api_call_timer_ticked = False
+# trx_status_api_call_timer: Timer = None
+trx_status_api_call_timer_ticked = True
 trx_status = None
-last_heartbeat_time = 0
-last_reported_mode = None
 last_reported_trx_tx_frequency = 0
 last_reported_trx_rx_frequency = 0
-last_reported_rf_power = None
 
 
 def debug_print(value):
@@ -117,28 +110,32 @@ def trx_status_api_call_timer_tick(timer):
     trx_status_api_call_timer_ticked = True
 
 def send_data_to_wavelog(
-    config: dict,
     mode: str,
     tx_freq: int,
     rx_freq: int,
-    rf_power: int,
 ):
-    gc.collect()  # free up memory before POST, as it is apparently resource heavy
-    
+    # gc.collect()
+    debug_print(f'mem f: {gc.mem_free()}')
+    debug_print(f'mem a: {gc.mem_alloc()}')
     payload = {
         'mode_rx': mode,
         'mode': mode,
         'frequency_rx': str(rx_freq),
-        'key': config[CFG_KEY_WAVELOG_API_KEY],
-        'power': None if rf_power is None else rf_power,
+        'key': cfg[CFG_KEY_WAVELOG_API_KEY],
+        'power': None,
         'frequency': str(tx_freq),
-        'radio': config[CFG_KEY_RADIO_NAME],
+        'radio': cfg[CFG_KEY_RADIO_NAME],
     }
-    timeout = float(config[CFG_KEY_WAVELOG_API_CALL_TIMEOUT])
-    url = config[CFG_KEY_WAVELOG_API_URL]
-    r = requests.post(url, json=payload, timeout=timeout)
-    debug_print(r.text)
+    timeout = float(cfg[CFG_KEY_WAVELOG_API_CALL_TIMEOUT])
+    url = cfg[CFG_KEY_WAVELOG_API_URL]
+    debug_print(f'mem f: {gc.mem_free()}')
+    debug_print(f'mem a: {gc.mem_alloc()}')
+    r = urequests.post(url, json=payload, timeout=timeout)
     r.close()
+    debug_print(f'mem f: {gc.mem_free()}')
+    debug_print(f'mem a: {gc.mem_alloc()}')
+    
+    return tx_freq
 
 def do_wifi_connect(wlan: network.WLAN, ssid: str, password: str):
     if not wlan.isconnected():
@@ -168,12 +165,11 @@ def display_status(trx_status: TrxStatus, trx_supported_values: set, display, wl
         
 
     mode_string = trx_status.mode if trx_status.mode is not "" else NO_VALUE_PLACEHOLDER
-    power_string = f"{trx_status.rf_power} W" if trx_status.rf_power else NO_VALUE_PLACEHOLDER
     
     wlan_strength = wlan.status("rssi")
-    if wlan_strength > -60:
+    if wlan_strength > -50:
         wlan_human_readable = f"Good ({wlan_strength})"
-    elif wlan_strength > -70 and wlan_strength <= -60:
+    elif wlan_strength > -60 and wlan_strength <= -50:
         wlan_human_readable = f"Fair ({wlan_strength})"
     else:
         wlan_human_readable = f"Poor ({wlan_strength})"
@@ -185,10 +181,11 @@ def display_status(trx_status: TrxStatus, trx_supported_values: set, display, wl
     
     display.fill(0)
     display.text(f'RX f: {rx_freq_string}', 0, 0, 1)
-    display.text(f'TX f: {tx_freq_string}', 0, 12, 1)
-    display.text(f'Mode: {mode_string}', 0, 24, 1)
-    display.text(f'Power: {power_string}', 0, 36, 1)
-    #todo display.text(f'API call OK: ({api_success_flag})', 0, 36, 1)
+    # display.text(f'TX f: {tx_freq_string}', 0, 12, 1)
+    # display.text(f'Mode: {mode_string}', 0, 24, 1)
+    display.text(f'mem f: {gc.mem_free()}', 0, 12, 1)
+    display.text(f'mem a: {gc.mem_alloc()}', 0, 24, 1)
+    display.text(f'API call: ({api_success_flag})', 0, 36, 1)
     display.text(f'Wifi: {wlan_human_readable}', 0, 48, 1)
     display.show()
 
@@ -209,7 +206,7 @@ def display_wifi_connecting_message(display, ssid: str):
     display.text(ssid, 0, 36, 1)
     display.show()
 
-def display_wifi_connected_message(display):
+def display_wifi_connected_message(display, ssid: str):
     display.fill(0)
     display.text("Wifi connected!", 0, 0, 1)
     display.show()
@@ -217,7 +214,8 @@ def display_wifi_connected_message(display):
 def display_data_saved_message(display):
     display.fill(0)
     display.text("Config saved!", 0, 0, 1)
-    display.text("rebooting...", 0, 24, 1)
+    display.text("Please reboot", 0, 24, 1)
+    display.text("the device", 0, 36, 1)
     display.show()
     
 def display_splash_screen(display, config: dict):
@@ -257,26 +255,6 @@ def display_radio_driver_missing_message(display):
     display.text("and upload", 0, 36, 1)
     display.text("radio driver", 0, 48, 1)
     display.show()
-    
-def handle_api_call_status_led():
-    if trx_status is None:
-        return
-    
-    current_tx_frequency = trx_status.current_tx_frequency(
-        status_values_supported_by_trx=status_values_supported_by_trx
-    )
-    current_rx_frequency = trx_status.current_rx_frequency(
-        status_values_supported_by_trx=status_values_supported_by_trx
-    )
-    
-    if radio_status_is_not_up_to_date():
-        # radio statis has changed and was not yet sent to API, turn on "not ready" LED
-        api_call_ok_led_pin.value(0)
-        api_call_not_ok_led_pin.value(1)
-    else:
-        # all data is up-to-date and was already sent to API, turn on "ready" LED
-        api_call_ok_led_pin.value(1)
-        api_call_not_ok_led_pin.value(0)
 
 def config_file_exists() -> bool:
     # this assumes that file is in root dir
@@ -303,7 +281,7 @@ def read_config() -> dict:
         with open(CONFIG_FILE_NAME, "rb") as fp:
             cfg_file_content = fp.read()
             cfg_from_file = json.loads(cfg_file_content)
-            cfg.update(cfg_from_file)
+            cfg.update(cfg_from_file) 
     
     return cfg
 
@@ -313,99 +291,74 @@ def save_config(config: dict):
     f.write(serialized)
     f.close()
 
-@setup_http_server.route("GET", "/")
-def setup_page_handler(conn, request):
-    response = HTTPResponse(200, "text/html")
-    response.send(conn)
-    with open("setup.html", "r") as fp:
-        setup_html = fp.read()
-        
-        cfg = read_config()
-        # fix the value of radioDriverName so it is not empty string in on the setup page
-        if not cfg.get(CFG_KEY_RADIO_DRIVER_NAME):
-            cfg[CFG_KEY_RADIO_DRIVER_NAME] = "None"
-
-        # replace variable placeholders in html with actual config values
-        for key, val in cfg.items():
-            setup_html = setup_html.replace(f"{{{{{key}}}}}", str(val))
-
-        conn.write(setup_html)
-
-@setup_http_server.route("POST", "/save")
-def save_cfg_handler(conn, request):
-    from multipart_parser import PushMultipartParser, MultipartSegment, MultipartPart
-
-    content_type = request.header.get(b"content-type").decode()
-    content_length = int(request.header.get(b"content-length").decode())
-
-    if "multipart/form-data" not in content_type:
-        raise Exception(f"unexpected content-type: '{content_type}'")
-
-    cfg = read_config()
-
-    debug_print("Parsing received config data and updating their values")
-    boundary = content_type.split("boundary=", 1)[1]
-    read_chunk_size = 100
-    bytes_read = 0
-    radio_driver_temp_file_name = "radio_driver_file_buffer"
-    radio_driver_file_buffer = open(radio_driver_temp_file_name, "wb")
-    uploaded_radio_driver_file_name = None
-    parser = PushMultipartParser(boundary=boundary, content_length=content_length)
+# @setup_http_server.route("GET", "/")
+# def setup_page_handler(conn, request):
+#     response = HTTPResponse(200, "text/html")
+#     response.send(conn)
+#     with open("setup.html", "r") as fp:
+#         setup_html = fp.read()
+#
+#         cfg = read_config()
+#         # fix the value of radioDriverName so it is not empty string in on the setup page
+#         if not cfg.get(CFG_KEY_RADIO_DRIVER_NAME):
+#             cfg[CFG_KEY_RADIO_DRIVER_NAME] = "None"
+#
+#         # replace variable placeholders in html with actual config values
+#         for key, val in cfg.items():
+#             setup_html = setup_html.replace(f"{{{{{key}}}}}", str(val))
+#
+#         conn.write(setup_html)
+#
+# @setup_http_server.route("POST", "/save")
+# def save_cfg_handler(conn, request):
+#     content_type = request.header.get(b"content-type").decode()
+#     content_length = int(request.header.get(b"content-length").decode())
+#
+#     if "multipart/form-data" not in content_type:
+#         raise Exception(f"unexpected content-type: '{content_type}'")
+#
+#     debug_print("Parsing received config data")
+#     boundary = content_type.split("boundary=", 1)[1]
+#     chunk_size = 100
+#     bytes_read = 0
+#     multipart_parts = []
+#     with PushMultipartParser(boundary=boundary, content_length=content_length) as parser:
+#         part = None
+#         while bytes_read != content_length:
+#             chunk = conn.recv(chunk_size)
+#             bytes_read += len(chunk)
+#
+#             for segment in parser.parse(chunk):
+#                 if isinstance(segment, MultipartSegment):  # Start of new part
+#                     part = MultipartPart(segment=segment)
+#                 elif segment:  # Non-empty bytearray
+#                     part._write(segment)
+#                 else:  # None
+#                     part._mark_complete()
+#                     multipart_parts.append(part)
+#                     part = None
+#         parser.close()
+#
+#     debug_print("Updating config values")
+#     cfg = read_config()
+#     for p in multipart_parts:
+#         if p.name == "radioDriver" and p.filename and p.value:
+#             f = open(RADIO_DRIVER_FILE_NAME, "w")
+#             f.write(p.value)
+#             f.close()
+#             cfg[CFG_KEY_RADIO_DRIVER_NAME] = p.filename.split(".ini")[0]
+#         else:
+#             if p.name == CFG_KEY_RADIO_REPLY_TIMEOUT or p.name == CFG_KEY_WAVELOG_API_CALL_TIMEOUT:
+#                 # replace decimal comma for point due to possible browser locale setting
+#                 cfg[p.name] = str(p.value.replace(",","."))
+#             else:
+#                 cfg[p.name] = str(p.value)
+#
+#     debug_print("Saving config values")
+#     save_config(config=cfg)
+#     debug_print("Config values saved")
+#     display_data_saved_message(display=display)
     
-    part = None
-    while bytes_read != content_length:
-        chunk = conn.recv(read_chunk_size)
-        bytes_read += len(chunk)
-
-        for segment in parser.parse(chunk):
-            if isinstance(segment, MultipartSegment):
-                # Detected start of new multipart-part
-                part = MultipartPart(segment=segment)
-                if part.name == "radioDriver" and part.filename:
-                    part._set_alternative_buffer(radio_driver_file_buffer)
-            elif segment:
-                # Non-empty bytearray - append to current "in-progress" part
-                part._write(segment)
-            else:
-                # None - signalizes end of the multipart-part
-                if part.name == "radioDriver" and part.filename:
-                    # finalize reading of radio driver file
-                    radio_driver_file_buffer.close()
-                    uploaded_radio_driver_file_name = part.filename
-                else:
-                    # finalize reading of config parameter parts and update relevant cfg values
-                    part._mark_complete()
-                    if part.name == CFG_KEY_RADIO_REPLY_TIMEOUT or part.name == CFG_KEY_WAVELOG_API_CALL_TIMEOUT:
-                        # replace decimal comma for point due to possible browser locale setting
-                        cfg[part.name] = str(part.value.replace(",", "."))
-                    else:
-                        cfg[part.name] = str(part.value)
-                        
-                part = None  # free up the resources
-    parser.close()
-        
-    temp_driver_file_size = os.stat(radio_driver_temp_file_name)[6]
-    if temp_driver_file_size > 0:
-        # rename temp file to the resulting file name when received data was not empty
-        # and update relevant cfg value
-        debug_print("Renaming temp radio driver file to final name")
-        os.rename(radio_driver_temp_file_name, RADIO_DRIVER_FILE_NAME)
-        cfg[CFG_KEY_RADIO_DRIVER_NAME] = uploaded_radio_driver_file_name.split(".ini")[0]
-    else:
-        debug_print("No radio driver file received - deleting temp file")
-        # received no data - delete the temp file
-        os.remove(radio_driver_temp_file_name)
-
-    debug_print("Saving config values")
-    save_config(config=cfg)
-    debug_print("Config values saved")
-    display_data_saved_message(display=display)
-    time.sleep(2)
-    global force_reboot
-    force_reboot = True
-    
-    return STOP_SERVER
-
 def get_commands_for_execution():
     # read all STATUS commands from driver file
     parser = OmnirigConfigParser()
@@ -456,7 +409,6 @@ def read_trx_status():
     freq_a = None
     freq_b = None
     rit_offset_freq = None
-    rf_power = None
     
     for item, val in results.items():
         # mode
@@ -492,10 +444,6 @@ def read_trx_status():
             freq_a = int(val)
         if item == "pmFreqB":
             freq_b = int(val)
-            
-        # rf power
-        if item == "pmRfPower":
-            rf_power = int(round(val))
         
         # rit offset frequency
         if item == "pmRitOffset":
@@ -525,38 +473,10 @@ def read_trx_status():
         xit_enabled=xit_enabled,
         rit_offset_freq=rit_offset_freq,
         active_vfo=active_vfo,
-        rf_power=rf_power,
     )
-    
+        
 def radio_driver_is_missing(config: dict) -> bool:
-    # this assumes that file is in root dir
-    driver_file_exists = RADIO_DRIVER_FILE_NAME in os.listdir()
-    config_entry_exists = config.get(CFG_KEY_RADIO_DRIVER_NAME)
-    return not driver_file_exists or not config_entry_exists
-
-def radio_status_is_not_up_to_date() -> bool:
-    """
-    Compare current radio status values to the ones that were already sent to API
-    and return True in case current values differ to the values that were sent to API
-    """
-    current_tx_frequency = trx_status.current_tx_frequency(
-        status_values_supported_by_trx=status_values_supported_by_trx
-    )
-    current_rx_frequency = trx_status.current_rx_frequency(
-        status_values_supported_by_trx=status_values_supported_by_trx
-    )
-    frequency_has_changed = (
-        last_reported_trx_tx_frequency != current_tx_frequency
-        or last_reported_trx_rx_frequency != current_rx_frequency
-    )
-    mode_has_changed = last_reported_mode != trx_status.mode
-    rf_power_has_changed = last_reported_rf_power != trx_status.rf_power
-    
-    return (
-        frequency_has_changed
-        or mode_has_changed
-        or rf_power_has_changed
-    )
+    return not config.get(CFG_KEY_RADIO_DRIVER_NAME)
     
     
 # init code here
@@ -566,7 +486,7 @@ if config_file_exists():
     display_splash_screen(display=display, config=cfg)
     time.sleep(SPLASH_SCREEN_WAIT_TIME)
     is_setup_mode_active = False
-    wifi_ap_interface.active(False)
+    # wifi_ap_interface.active(False)
     wifi_station_interface.active(True)
     wifi_station_interface.config(dhcp_hostname=DEVICE_NAME.lower())
     display_wifi_connecting_screen(display=display, config=cfg)
@@ -575,8 +495,12 @@ if config_file_exists():
         ssid=cfg[CFG_KEY_WIFI_NAME],
         password=cfg[CFG_KEY_WIFI_PASS],
     )
-    display_wifi_connected_message(display=display)
+    display_wifi_connected_message(display=display, ssid=cfg[CFG_KEY_WIFI_NAME])
     time.sleep(WIFI_CONNECTED_SCREEN_WAIT_TIME)
+    commands_to_execute = get_commands_for_execution()
+    status_values_supported_by_trx = get_status_values_supported_by_trx(
+        commands=commands_to_execute
+    )
     uart_baudrate = int(cfg.get(CFG_KEY_RADIO_BAUD_RATE))
     uart_bits = int(cfg.get(CFG_KEY_RADIO_DATA_BITS))
     uart_stop_bits = int(cfg.get(CFG_KEY_RADIO_STOP_BITS))
@@ -595,27 +519,21 @@ if config_file_exists():
         parity=parity,
         stop=uart_stop_bits,
     )
-    trx_status_read_timer = Timer(0)
-    radio_polling_frequency = 1 / float(cfg[CFG_KEY_RADIO_POLLING_INTERVAL])
-    trx_status_read_timer.init(
-        mode=Timer.PERIODIC,
-        freq=radio_polling_frequency,
-        callback=trx_status_read_timer_tick,
-    )
-    
-    trx_status_api_call_timer = Timer(1)
-    api_call_frequency = 1 / float(cfg[CFG_KEY_WAVELOG_API_CALL_INTERVAL])
-    trx_status_api_call_timer.init(
-        mode=Timer.PERIODIC,
-        freq=api_call_frequency,
-        callback=trx_status_api_call_timer_tick,
-    )
-    
-    if not radio_driver_is_missing(config=cfg):
-        commands_to_execute = get_commands_for_execution()
-        status_values_supported_by_trx = get_status_values_supported_by_trx(
-            commands=commands_to_execute
-        )
+    # trx_status_read_timer = Timer(0)
+    # radio_polling_frequency = 1 / float(cfg[CFG_KEY_RADIO_POLLING_INTERVAL])
+    # trx_status_read_timer.init(
+    #     mode=Timer.PERIODIC,
+    #     freq=radio_polling_frequency,
+    #     callback=trx_status_read_timer_tick,
+    # )
+    #
+    # trx_status_api_call_timer = Timer(1)
+    # api_call_frequency = 1 / float(cfg[CFG_KEY_WAVELOG_API_CALL_INTERVAL])
+    # trx_status_api_call_timer.init(
+    #     mode=Timer.PERIODIC,
+    #     freq=api_call_frequency,
+    #     callback=trx_status_api_call_timer_tick,
+    # )
 else:
     # this is executed until user setup the device for the first time
     is_setup_mode_active = True
@@ -624,7 +542,7 @@ else:
     wifi_ap_interface.config(essid=DEVICE_NAME)
     while wifi_ap_interface.active() == False:
         pass # wait for AP to become ready
-    server_ip_address = wifi_ap_interface.ifconfig()[0]
+    server_ip_address = wifi_ap_interface.ifconfig()[0] 
     
     display_setup_mode_active_message(
         display=display,
@@ -632,28 +550,27 @@ else:
         ssid=DEVICE_NAME,
     )
     setup_http_server.start()
-    
-gc.collect()  # memory cleanup after init
+
+gc.collect()  # cleanup after init
 
 # main loop
 while True:
-    # force reboot handling
-    if force_reboot:
-        debug_print("Force rebooting")
-        reset()
-    
     # setup mode button handling
-    if not is_setup_mode_active and setup_button_pin.value() == 0:
-        ip_address = wifi_station_interface.ifconfig()[0]
-        display_setup_mode_active_message(
-            display=display,
-            ip=ip_address,
-            ssid=cfg.get(CFG_KEY_WIFI_NAME),
-        )
-        trx_status_read_timer.deinit()
-        is_setup_mode_active = True
-        debug_print("Setup mode is active")
-        setup_http_server.start()  # this is blocking call
+    if setup_button.value() == 0:
+        if not is_setup_mode_active:
+            ip_address = wifi_station_interface.ifconfig()[0]
+            display_setup_mode_active_message(
+                display=display,
+                ip=ip_address,
+                ssid=cfg.get(CFG_KEY_WIFI_NAME),
+            )
+            trx_status_read_timer.deinit()
+            is_setup_mode_active = True
+            debug_print("Setup mode is active")
+            setup_http_server.start()  # this is blocking call
+        else:
+            debug_print("Rebooting")
+            reset()  # reset the ESP32
     
     # ensure radio driver is available
     if radio_driver_is_missing(config=cfg):
@@ -687,46 +604,23 @@ while True:
     # report TRX status to API
     if trx_status_api_call_timer_ticked and not is_setup_mode_active:
         try:
-            current_tx_frequency = trx_status.current_tx_frequency(
-                status_values_supported_by_trx=status_values_supported_by_trx
+            current_tx_frequency = 14222000
+            current_rx_frequency = 14333000
+            # todo OR if 20 secs elapsed - to keep wavelog knowing the radio is alive???
+            debug_print("Sending data to wavelog")
+            last_reported_trx_tx_frequency = send_data_to_wavelog(
+                # config=cfg,
+                mode="AM",
+                tx_freq=current_tx_frequency,
+                rx_freq=current_rx_frequency,
             )
-            current_rx_frequency = trx_status.current_rx_frequency(
-                status_values_supported_by_trx=status_values_supported_by_trx
-            )
-            is_power_command_supported = "pmRfPower" in status_values_supported_by_trx
-            power_value_ok = (
-                True if not is_power_command_supported else trx_status.rf_power is not None
-            )
-            heartbeat_threshold_passed = (time.time() - last_heartbeat_time) > API_HEARTBEAT_TIME
-            
-            if (
-                current_tx_frequency
-                and trx_status.mode
-                and power_value_ok
-                and (radio_status_is_not_up_to_date() or heartbeat_threshold_passed)
-            ):
-                debug_print("Sending data to wavelog")
-                send_data_to_wavelog(
-                    config=cfg,
-                    mode=trx_status.mode,
-                    tx_freq=current_tx_frequency,
-                    rx_freq=current_rx_frequency,
-                    rf_power=trx_status.rf_power,
-                )
-                last_heartbeat_time = time.time()
-                last_reported_trx_tx_frequency = current_tx_frequency
-                last_reported_trx_rx_frequency = current_rx_frequency
-                last_reported_mode = trx_status.mode
-                last_reported_rf_power = trx_status.rf_power
-                debug_print("Sent!")
+            debug_print("Sent!")
         except Exception as e:
             print(e)
-        trx_status_api_call_timer_ticked = False
         
-    # API call status LED handling
-    handle_api_call_status_led()
+    time.sleep(0.3)
+    #todo hypothesis: test get request - does it also timeout?
+    #todo hypothesis: LCD jamming?
+    #todo hypothesis: try to flash old version of program to debug timeouts?
     
-    # todo restructure app to have simple main with error handling and reset as in micropython best practices
-    # todo rewrite to async to support xml rpc server for cloudlog offline and bluetooth
-    # todo hypothesis - mpy-cross compilation - frozen modules
-    
+    # gc.collect() # this needs to stay

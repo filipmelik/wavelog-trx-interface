@@ -562,6 +562,9 @@ class MultipartPart(object):
         return self._segment.content_type or (
             "application/octet-stream" if self.filename else "text/plain")
     
+    def _set_alternative_buffer(self, buffer):
+        self.file = buffer
+    
     def _write(self, chunk):
         self.size += len(chunk)
         self.file.write(chunk)
