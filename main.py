@@ -7,6 +7,7 @@ import requests
 import os
 from micropython import const
 from machine import UART, Pin, SoftI2C, Timer, reset
+from neopixel import NeoPixel
 from lib.http_server import (HTTPResponse, HTTPServer, STOP_SERVER)
 from omnirig import (
     OmnirigConfigParser,
@@ -72,13 +73,12 @@ VALUES_OF_INTEREST = [
 
 NO_VALUE_PLACEHOLDER = const("---")
 
-setup_button_pin = Pin(15, Pin.IN, Pin.PULL_UP)
-api_call_ok_led_pin = Pin(12, Pin.OUT, value=0)
-api_call_not_ok_led_pin = Pin(27, Pin.OUT, value=0)
+setup_button_pin = Pin(6, Pin.IN, Pin.PULL_UP)
+on_board_rgb_led_pin = Pin(48, Pin.OUT)
 
-i2c = SoftI2C(sda=Pin(4), scl=Pin(5))
+i2c = SoftI2C(sda=Pin(1), scl=Pin(2))
 display = ssd1306.SSD1306_I2C(128, 64, i2c)
-
+on_board_rgb_led = NeoPixel(on_board_rgb_led_pin, 1)
 uart = UART(2)
 value_decoder = OmnirigValueDecoder()
 command_executor = OmnirigCommandExecutor(value_decoder=value_decoder, debug=DEBUG)
@@ -170,9 +170,9 @@ def display_status(trx_status: TrxStatus, trx_supported_values: set, display, wl
     power_string = f"{trx_status.rf_power} W" if trx_status.rf_power else NO_VALUE_PLACEHOLDER
     
     wlan_strength = wlan.status("rssi")
-    if wlan_strength > -60:
+    if wlan_strength > -70:
         wlan_human_readable = f"Good ({wlan_strength})"
-    elif wlan_strength > -70 and wlan_strength <= -60:
+    elif wlan_strength > -80 and wlan_strength <= -70:
         wlan_human_readable = f"Fair ({wlan_strength})"
     else:
         wlan_human_readable = f"Poor ({wlan_strength})"
@@ -255,21 +255,14 @@ def handle_api_call_status_led():
     if trx_status is None:
         return
     
-    current_tx_frequency = trx_status.current_tx_frequency(
-        status_values_supported_by_trx=status_values_supported_by_trx
-    )
-    current_rx_frequency = trx_status.current_rx_frequency(
-        status_values_supported_by_trx=status_values_supported_by_trx
-    )
-    
     if radio_status_is_not_up_to_date():
-        # radio statis has changed and was not yet sent to API, turn on "not ready" LED
-        api_call_ok_led_pin.value(0)
-        api_call_not_ok_led_pin.value(1)
+        # radio status has changed and was not yet sent to API
+        on_board_rgb_led[0] = (10, 10, 0) # yellow, low brightness
     else:
-        # all data is up-to-date and was already sent to API, turn on "ready" LED
-        api_call_ok_led_pin.value(1)
-        api_call_not_ok_led_pin.value(0)
+        # all data is up-to-date and was already sent to API
+        on_board_rgb_led[0] = (0, 10, 0)  # green, low brightness
+        
+    on_board_rgb_led.write()
 
 def config_file_exists() -> bool:
     # this assumes that file is in root dir
@@ -550,7 +543,6 @@ def radio_status_is_not_up_to_date() -> bool:
         or mode_has_changed
         or rf_power_has_changed
     )
-    
     
 # init code here
 if config_file_exists():
