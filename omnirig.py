@@ -52,7 +52,7 @@ class TrxStatus:
             tx_freq = self.freq
 
         # include XIT
-        if self.xit_enabled:
+        if self.xit_enabled and self.rit_offset_freq:
             tx_freq += int(self.rit_offset_freq)
         
         return tx_freq
@@ -77,7 +77,7 @@ class TrxStatus:
             rx_freq = 0
             
         # include RIT
-        if self.rit_enabled:
+        if self.rit_enabled and self.rit_offset_freq:
             rx_freq += int(self.rit_offset_freq)
         
         return rx_freq
