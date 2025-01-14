@@ -1,9 +1,11 @@
+import asyncio
 import re
 import time
 
 class TrxStatus:
     def __init__(
         self,
+        status_values_supported_by_trx: set,
         mode: str,
         active_vfo: str,
         freq: int = None,
@@ -15,6 +17,7 @@ class TrxStatus:
         rit_offset_freq: int = None,
         rf_power: int = None,
     ):
+        self._status_values_supported_by_trx = status_values_supported_by_trx
         self.mode = mode
         self.active_vfo = active_vfo
         self.freq = freq
@@ -26,17 +29,17 @@ class TrxStatus:
         self.rit_offset_freq = rit_offset_freq
         self.rf_power = rf_power
         
-    def current_tx_frequency(self, status_values_supported_by_trx: set):
-        if not status_values_supported_by_trx:
+    def current_tx_frequency(self):
+        if not self._status_values_supported_by_trx:
             return 0
         
         if (
-            "pmFreqA" in status_values_supported_by_trx
+            "pmFreqA" in self._status_values_supported_by_trx
             and self.active_vfo in ["pmVfoAA", "pmVfoBA"]
         ):
             tx_freq = self.freq_a
         elif (
-            "pmFreqB" in status_values_supported_by_trx
+            "pmFreqB" in self._status_values_supported_by_trx
             and self.active_vfo in ["pmVfoAB", "pmVfoBB"]
         ):
             tx_freq = self.freq_b
@@ -57,17 +60,17 @@ class TrxStatus:
         
         return tx_freq
     
-    def current_rx_frequency(self, status_values_supported_by_trx: set):
-        if not status_values_supported_by_trx:
+    def current_rx_frequency(self):
+        if not self._status_values_supported_by_trx:
             return 0
         
         if (
-            "pmFreqA" in status_values_supported_by_trx
+            "pmFreqA" in self._status_values_supported_by_trx
             and self.active_vfo in ["pmVfoA", "pmVfoAA", "pmVfoAB"]
         ):
             rx_freq = self.freq_a
         elif (
-            "pmFreqB" in status_values_supported_by_trx
+            "pmFreqB" in self._status_values_supported_by_trx
             and self.active_vfo in ["pmVfoB", "pmVfoBA", "pmVfoBB"]
         ):
             rx_freq = self.freq_b
@@ -369,19 +372,24 @@ class OmnirigValueDecoder:
     
 class OmnirigCommandExecutor:
     
-    def __init__(self, value_decoder: OmnirigValueDecoder, debug: bool = False):
+    def __init__(self, value_decoder: OmnirigValueDecoder, logger = None):
         self.value_decoder = value_decoder
-        self.debug = debug
+        self.logger = logger
     
-    def execute_status_command(
+    async def execute_status_command(
         self,
         cmd: OmnirigStatusCommand,
         reply_timeout_secs: float,
         uart
     ) -> dict:
+        if type(cmd) is not OmnirigStatusCommand:
+            err_msg = "Programming error, given command is not a OmnirigStatusCommand"
+            self.logger.exception(err_msg)
+            raise Exception(err_msg)
+        
         _ = uart.read()  # read and discard everything in UART buffer prior to sending command
         
-        self._debug_print(f"Sending command: {cmd.command}")
+        self._debug_log(f"Sending status command: {cmd.command}")
         if cmd.command_data_type == OmnirigStatusCommand.DATA_TYPE_BIN:
             uart.write(bytes.fromhex(cmd.command))
         else:
@@ -409,8 +417,9 @@ class OmnirigCommandExecutor:
                 pass
             elapsed_ns = time.time_ns() - start_time
             if elapsed_ns > (reply_timeout_secs * 10 ** 9):
-                self._debug_print("Timeout waiting for TRX reply")
+                self._debug_log("Timeout waiting for TRX reply")
                 break
+            await asyncio.sleep(0)
         
         if not trx_reply_buffer:
             return {}
@@ -418,8 +427,8 @@ class OmnirigCommandExecutor:
         is_valid_reply = self._is_valid_trx_reply_for_command(
             command=cmd, trx_reply=trx_reply_buffer
         )
-        self._debug_print(f"TRX reply: {trx_reply_buffer.hex()}")
-        self._debug_print(f"Is valid reply: {str(is_valid_reply)}")
+        self._debug_log(f"TRX reply: {trx_reply_buffer.hex()}")
+        self._debug_log(f"Is valid reply: {str(is_valid_reply)}")
         
         if not is_valid_reply:
             return {}
@@ -469,6 +478,6 @@ class OmnirigCommandExecutor:
         return ((int.from_bytes(a, 'big') & int.from_bytes(b, 'big'))
                 .to_bytes(max(len(a), len(b)), 'big'))
 
-    def _debug_print(self, value):
-        if self.debug:
-            print(f"DEBUG: {value}")
+    def _debug_log(self, value):
+        if self.logger:
+            self.logger.debug(f"OMNIRIG: {value}")
