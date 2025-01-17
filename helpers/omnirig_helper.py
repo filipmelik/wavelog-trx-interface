@@ -1,6 +1,7 @@
 from application.constants import RADIO_DRIVER_FILE_PATH
 from helpers.logger import Logger
-from lib.omnirig import OmnirigConfigParser, OmnirigStatusCommand
+from lib.omnirig import OmnirigConfigParser, OmnirigStatusCommand, AllOmnirigCommandsRawData, OmnirigValueSetCommand, \
+    TrxStatus
 
 
 class OmnirigHelper:
@@ -39,7 +40,17 @@ class OmnirigHelper:
     ):
         self._logger = logger
         
+        # read all raw commands data from driver file
+        parser = OmnirigConfigParser()
+        all_commands_raw_data = parser.extract_all_commands_raw_data(
+            filepath=RADIO_DRIVER_FILE_PATH
+        )
+        
+        self._value_set_commands = self._prepare_value_set_commands(
+            all_commands_raw_data=all_commands_raw_data
+        )
         self._status_commands_of_interest = self._get_status_commands_of_interest(
+            all_commands_raw_data=all_commands_raw_data,
             values_of_interest=self.DEFAULT_STATUS_VALUES_OF_INTEREST,
         )
         self._status_values_supported_by_trx = self._get_status_values_supported_by_trx(
@@ -58,23 +69,55 @@ class OmnirigHelper:
         """
         return self._status_values_supported_by_trx
     
+    def get_value_set_commands(self) -> dict:
+        """
+        Return cached value-set commands supported by TRX in form of dict where key is command name
+        """
+        return self._value_set_commands
+    
+    def get_frequency_set_command_for_currently_active_vfo(self, trx_status: TrxStatus):
+        if not self._status_values_supported_by_trx:
+            return None
+        
+        if not trx_status.active_vfo:
+            return None
+        
+        if (
+            "pmFreqA" in self._status_values_supported_by_trx
+            and trx_status.active_vfo in ["pmVfoAA", "pmVfoBA"]
+        ):
+            command_name = "pmFreqA"
+        elif (
+            "pmFreqB" in self._status_values_supported_by_trx
+            and trx_status.active_vfo in ["pmVfoAB", "pmVfoBB"]
+        ):
+            command_name = "pmFreqB"
+        elif trx_status.active_vfo == "pmVfoA":
+            command_name = "pmFreqA"
+        elif trx_status.active_vfo == "pmVfoB":
+            command_name = "pmFreqB"
+        else:
+            command_name = "pmFreq"
+        
+        value_set_commands = self.get_value_set_commands()
+
+        return value_set_commands.get(command_name)
+    
     def _get_status_commands_of_interest(
         self,
+        all_commands_raw_data: AllOmnirigCommandsRawData,
         values_of_interest: list,
     ) -> list:
         """
         Prepare list of STATUS (read) commands from radio driver currently
         present in the device. The list is further filtered, so only the
-        commands that are providing
+        commands that are providing values we are interested in are returned
         """
-        # read all STATUS commands from driver file
-        parser = OmnirigConfigParser()
-        status_command_sections = parser.extract_status_commands_sections(
-            filepath=RADIO_DRIVER_FILE_PATH
-        )
         commands = []
-        for status_cmd_section in status_command_sections:
-            cmd = OmnirigStatusCommand(status_command_data=status_cmd_section)
+        for status_cmd_data_container in all_commands_raw_data.status_commands_raw_data:
+            cmd = OmnirigStatusCommand(
+                command_raw_data=status_cmd_data_container.command_data
+            )
             commands.append(cmd)
         
         # filter out just commands that provides values we are interested in
@@ -86,6 +129,24 @@ class OmnirigHelper:
                     break
         
         return relevant_status_commands
+    
+    def _prepare_value_set_commands(
+        self,
+        all_commands_raw_data: AllOmnirigCommandsRawData
+    ) -> dict:
+        """
+        Get value set commands in form of dict where key is command name
+        """
+        value_write_commands = {}
+        
+        for cmd_data_container in all_commands_raw_data.value_set_commands_raw_data:
+            cmd = OmnirigValueSetCommand(
+                command_name=cmd_data_container.command_name,
+                command_raw_data=cmd_data_container.command_data,
+            )
+            value_write_commands[cmd_data_container.command_name] = cmd
+        
+        return value_write_commands
     
     def _get_status_values_supported_by_trx(self, status_commands: list) -> set:
         """

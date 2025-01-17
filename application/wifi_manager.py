@@ -21,8 +21,11 @@ class WifiManager:
         """
         Create wi-fi access point, wait until it is ready and return its IP address
         """
-        self._wifi_access_point_interface.active(True)
+        if self._wifi_station_interface.isconnected():
+            self._wifi_station_interface.disconnect()
+            
         self._wifi_station_interface.active(False)
+        self._wifi_access_point_interface.active(True)
         self._wifi_access_point_interface.config(essid=essid)
         
         while self._wifi_access_point_interface.active() == False:
@@ -32,7 +35,7 @@ class WifiManager:
         
         return server_ip_address
     
-    def setup_wifi(self):
+    def setup_wifi_as_client(self):
         """
         Setup wi-fi for station mode (as a client that will connect to the router)
         """
@@ -60,6 +63,18 @@ class WifiManager:
             self._wifi_station_interface.connect(ssid, password)
             while not self._wifi_station_interface.isconnected():
                 pass
+    
+    def disconnect_wifi(self):
+        """
+        Disconnect wi-fi station (client) interface
+        """
+        self._wifi_station_interface.disconnect()
+            
+    def is_connected(self) -> bool:
+        """
+        Check if station (client) interface is connected to AP
+        """
+        return self._wifi_station_interface.isconnected()
         
     def get_device_ip_address(self) -> str:
         """

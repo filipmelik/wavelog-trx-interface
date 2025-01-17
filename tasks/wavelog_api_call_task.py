@@ -37,10 +37,12 @@ class WavelogApiCallTask:
         self._last_reported_trx_rx_frequency = 0
         self._last_reported_rf_power = None
         
+        self._queue = RingbufQueue(2)
+        self._is_running = True
+        
     async def run(self):
-        queue = RingbufQueue(2)
-        self._message_broker.subscribe(TOPIC_TRX_STATUS, queue)
-        async for topic, trx_status in queue:
+        self._message_broker.subscribe(topic=TOPIC_TRX_STATUS, agent=self._queue)
+        async for topic, trx_status in self._queue:
             self._logger.debug(f"WavelogApiCallTask: received message: {str(trx_status)}")
             
             heartbeat_threshold_passed = (
@@ -91,6 +93,13 @@ class WavelogApiCallTask:
                     self._last_reported_rf_power = trx_status.rf_power
             except Exception as e:
                 self._logger.exception(f"WavelogApiCallTask: {str(e)}")
+                
+    def stop(self):
+        """
+        Stop the running task
+        """
+        self._is_running = False
+        self._message_broker.unsubscribe(topic=TOPIC_TRX_STATUS, agent=self._queue)
     
     async def _send_data_to_wavelog(
         self,

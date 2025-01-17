@@ -10,6 +10,7 @@ from application.setup_manager import SetupManager
 from machine import UART, Pin, SoftI2C
 from neopixel import NeoPixel
 from helpers.logger import Logger
+from lib.omnirig import OmnirigCommandExecutor, OmnirigValueDecoder, OmnirigValueEncoder
 
 LOG_LEVEL = Logger.DEBUG
 
@@ -51,6 +52,12 @@ async def main():
         config_manager=config_manager,
         neopixel=on_board_rgb_led,
     )
+    omnirig_command_executor = OmnirigCommandExecutor(
+        value_decoder=OmnirigValueDecoder(),
+        value_encoder=OmnirigValueEncoder(),
+        uart=uart,
+        logger=logger,
+    )
     
     device_is_already_configured = config_manager.config_file_exists()
     if device_is_already_configured:
@@ -66,6 +73,7 @@ async def main():
             wifi_manager=wifi_manager,
             setup_manager=setup_manager,
             omnirig_helper=omnirig_helper,
+            omnirig_command_executor=omnirig_command_executor,
         )
         await main_app.run()
     else:
@@ -81,11 +89,6 @@ async def main():
             ssid=access_point_ssid,
         )
         await setup_manager.run_setup_server(device_ip_address=device_ip_address)
-    
-    # todo here?
-    my_class = MyClass()  # Constructor might create tasks
-    task = asyncio.create_task(my_class.foo())  # Or you might do this
-    await my_class.run_forever()  # Non-terminating method
     
 try:
     asyncio.run(main())

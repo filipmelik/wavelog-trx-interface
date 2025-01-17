@@ -22,16 +22,25 @@ class DisplayStatusTask:
         self._wifi_manager = wifi_manager
         self._logger = logger
         self._message_broker = message_broker
+        self._queue = RingbufQueue(2)
+        
+        self._is_running = True
         
     async def run(self):
-        queue = RingbufQueue(2)
-        self._message_broker.subscribe(TOPIC_TRX_STATUS, queue)
-        async for topic, trx_status in queue:
+        self._message_broker.subscribe(topic=TOPIC_TRX_STATUS, agent=self._queue)
+        async for topic, trx_status in self._queue:
             self._logger.debug(f"DisplayStatusTask: received message: {str(trx_status)}")
             self._display_status(
                 trx_status=trx_status,
                 wifi_manager=self._wifi_manager,
             )
+            
+    def stop(self):
+        """
+        Stop the running task
+        """
+        self._is_running = False
+        self._message_broker.unsubscribe(topic=TOPIC_TRX_STATUS, agent=self._queue)
     
     def _display_status(
         self,
@@ -67,8 +76,14 @@ class DisplayStatusTask:
             else self.NO_VALUE_PLACEHOLDER
         )
         
-        wlan_strength = wifi_manager.get_signal_strength()
-        if wlan_strength > -70:
+        try:
+            wlan_strength = wifi_manager.get_signal_strength()
+        except:
+            wlan_strength = 999
+            
+        if wlan_strength == 999:
+            wlan_human_readable = "NO WIFI"
+        elif wlan_strength > -70:
             wlan_human_readable = f"Good ({wlan_strength})"
         elif wlan_strength > -80 and wlan_strength <= -70:
             wlan_human_readable = f"Fair ({wlan_strength})"

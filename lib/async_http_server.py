@@ -391,6 +391,7 @@ class webserver:
         self.parameterized_url_map = {}
         # Currently opened connections
         self.conns = {}
+        self.conns_tasks = {}
         # Statistics
         self.processed_connections = 0
 
@@ -656,7 +657,8 @@ class webserver:
                 handler = self._handler(asyncio.StreamReader(csock),
                                         asyncio.StreamWriter(csock, {}))
                 self.conns[hid] = handler
-                self.loop.create_task(handler)
+                conn_task = self.loop.create_task(handler)
+                self.conns_tasks[hid] = (conn_task)
                 # In case of max concurrency reached - temporary pause server:
                 # 1. backlog must be greater than max_concurrency, otherwise
                 #    client will got "Connection Reset"
@@ -678,12 +680,12 @@ class webserver:
             loop_forever - run loo.loop_forever(), otherwise caller must run it by itself.
         """
         self._server_coro = self._tcp_server(host, port, self.backlog)
-        self.loop.create_task(self._server_coro)
+        self._server_task = self.loop.create_task(self._server_coro)
         if loop_forever:
             self.loop.run_forever()
 
     def shutdown(self):
         """Gracefully shutdown Web Server"""
-        asyncio.cancel(self._server_coro)
-        for hid, coro in self.conns.items():
-            asyncio.cancel(coro)
+        self._server_task.cancel()
+        for hid, connection_task in self.conns.items():
+            connection_task.cancel()

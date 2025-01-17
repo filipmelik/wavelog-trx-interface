@@ -13,7 +13,6 @@ from helpers.omnirig_helper import OmnirigHelper
 from lib.asyncio.broker import Broker
 from lib.omnirig import (
     TrxStatus,
-    OmnirigValueDecoder,
     OmnirigCommandExecutor,
 )
 
@@ -27,6 +26,7 @@ class RigReadUartTask:
         config_manager: ConfigManager,
         message_broker: Broker,
         omnirig_helper: OmnirigHelper,
+        omnirig_command_executor: OmnirigCommandExecutor,
     ):
         self._uart = uart
         self._logger = logger
@@ -36,17 +36,15 @@ class RigReadUartTask:
         self._commands_to_execute = omnirig_helper.get_default_status_commands_of_interest()
         self._status_values_supported_by_trx = omnirig_helper.get_status_values_supported_by_trx()
         
-        self._command_executor = OmnirigCommandExecutor(
-            value_decoder=OmnirigValueDecoder(),
-            logger=self._logger,
-        )
+        self._omnirig_command_executor = omnirig_command_executor
+        self._is_running = True
     
     async def run(self):
         radio_polling_interval_ms = int(
             float(self._config.get(CFG_KEY_RADIO_POLLING_INTERVAL)) * 1000
         )
         
-        while True:
+        while self._is_running:
             try:
                 trx_status = await self._read_trx_status()
                 self._message_broker.publish(topic=TOPIC_TRX_STATUS, message=trx_status)
@@ -54,6 +52,12 @@ class RigReadUartTask:
                 self._logger.exception(str(e))
                 
             await asyncio.sleep_ms(radio_polling_interval_ms)
+            
+    def stop(self):
+        """
+        Stop the running task
+        """
+        self._is_running = False
     
     async def _read_trx_status(self):
         """
@@ -61,10 +65,9 @@ class RigReadUartTask:
         """
         results = {}
         for cmd in self._commands_to_execute:
-            cmd_results = await self._command_executor.execute_status_command(
+            cmd_results = await self._omnirig_command_executor.execute_values_read_command(
                 cmd=cmd,
                 reply_timeout_secs=float(self._config[CFG_KEY_RADIO_REPLY_TIMEOUT]),
-                uart=self._uart
             )
             if not cmd_results:
                 continue

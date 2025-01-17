@@ -1,11 +1,13 @@
 import lib.async_http_server as tinyweb
-from application.constants import TOPIC_TRX_STATUS
+from application.config_manager import ConfigManager
+from application.constants import TOPIC_TRX_STATUS, CFG_KEY_RADIO_REPLY_TIMEOUT
 from application.wifi_manager import WifiManager
 
 from helpers.logger import Logger
+from helpers.omnirig_helper import OmnirigHelper
 from lib.asyncio.broker import Broker
 from lib.asyncio.ringbuf_queue import RingbufQueue
-from lib.omnirig import TrxStatus
+from lib.omnirig import TrxStatus, OmnirigCommandExecutor
 
 
 class ApiServerTask:
@@ -15,12 +17,23 @@ class ApiServerTask:
         logger: Logger,
         wifi_manager: WifiManager,
         message_broker: Broker,
+        omnirig_helper: OmnirigHelper,
+        omnirig_command_executor: OmnirigCommandExecutor,
+        config_manager: ConfigManager,
     ):
         self._logger = logger
         self._wifi_manager = wifi_manager
         self._message_broker = message_broker
-        
+        self._omnirig_helper = omnirig_helper
+        self._omnirig_command_executor = omnirig_command_executor
+        self._config = config_manager.read_config()
+        self._queue = RingbufQueue(2)
+
         self.trx_status: TrxStatus = None
+        self._cloudlog_offline_xml_rpc_server = None
+        self._general_api_server = None
+        
+        self._is_running = True
         
     async def run_general_api_server(self):
         """
@@ -29,17 +42,16 @@ class ApiServerTask:
         device_ip_address = self._wifi_manager.get_device_ip_address()
         port = 54321 # todo this should be pulled out from config
         self._logger.debug(f"Starting general API server at {device_ip_address} port {port}")
-        server = tinyweb.webserver()
-        server.add_route('/qsy/<frequency>', self._qsy_request_handler, methods=['GET'])
-        server.run(host='0.0.0.0', port=port, loop_forever=False)
+        self._general_api_server = tinyweb.webserver()
+        self._general_api_server.add_route('/qsy/<frequency>', self._qsy_request_handler, methods=['GET'])
+        self._general_api_server.run(host='0.0.0.0', port=port, loop_forever=False)
         
     async def run_trx_status_messages_subscriber(self):
         """
         Run subscriber that will read the current TRX status messages
         """
-        queue = RingbufQueue(2)
-        self._message_broker.subscribe(TOPIC_TRX_STATUS, queue)
-        async for topic, trx_status in queue:
+        self._message_broker.subscribe(topic=TOPIC_TRX_STATUS, agent=self._queue)
+        async for topic, trx_status in self._queue:
             self.trx_status = trx_status
         
     async def run_cloudlog_offline_xml_rpc_server(self):
@@ -51,18 +63,27 @@ class ApiServerTask:
         self._logger.debug(
             f"Starting Cloudlog Offline XML-RPC server at {device_ip_address} port {port}"
         )
-        server = tinyweb.webserver()
-        server.add_route(
+        self._cloudlog_offline_xml_rpc_server = tinyweb.webserver()
+        self._cloudlog_offline_xml_rpc_server.add_route(
             url='/',
             f=self._xml_rpc_request_handler,
             methods=['POST'],
             save_headers=['Content-Length', 'Content-Type'],
         )
-        server.run(host='0.0.0.0', port=port, loop_forever=False)
+        self._cloudlog_offline_xml_rpc_server.run(host='0.0.0.0', port=port, loop_forever=False)
+        
+    def stop(self):
+        """
+        Stop the running tasks
+        """
+        self._is_running = False
+        self._general_api_server.shutdown()
+        self._cloudlog_offline_xml_rpc_server.shutdown()
+        self._message_broker.unsubscribe(topic=TOPIC_TRX_STATUS, agent=self._queue)
     
     async def _qsy_request_handler(self, request, response, frequency_string):
         """
-        Server handler for triggering QSY to given frequency
+        Server handler for triggering QSY to given frequency on currently active Rig's VFO
         """
         self._logger.debug("ApiServerTask: Running QSY request handler")
         
@@ -75,9 +96,42 @@ class ApiServerTask:
             return
         
         self._logger.debug(f"ApiServerTask: QSY to {frequency}")
-        # todo actual QSY code here
         
-        response_payload = '{"result": "success"}'
+        if not self.trx_status:
+            # failsafe
+            self._logger.debug(
+                "ApiServerTask: QSY API request handler - TRX status not ready, sending 404"
+            )
+            await response.error(code=404, msg="TRX status not ready")
+        
+        # actual qsy code
+        cmd = self._omnirig_helper.get_frequency_set_command_for_currently_active_vfo(
+            trx_status=self.trx_status
+        )
+        if not cmd:
+            self._logger.info(
+                "ApiServerTask: QSY API request handler - TRX status not ready "
+                "or command for setting frequency not supported, sending 404"
+            )
+            await response.error(
+                code=404,
+                msg="TRX status not ready or command for setting frequency not supported",
+            )
+            return
+            
+        success = await self._omnirig_command_executor.execute_write_command(
+            cmd=cmd,
+            value=frequency,
+            reply_timeout_secs=float(self._config[CFG_KEY_RADIO_REPLY_TIMEOUT]),
+        )
+        
+        if success:
+            response_payload = '{"result": "success"}'
+            response.code = 200
+        else:
+            response_payload = '{"result": "failure, rig command has failed"}'
+            response.code = 500
+        
         response.version = '1.1'
         response.add_header('Connection', 'close')
         response.add_header('Content-Type', 'application/json')
