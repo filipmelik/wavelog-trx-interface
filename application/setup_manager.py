@@ -8,7 +8,7 @@ from application.constants import (
     CFG_KEY_RADIO_DRIVER_NAME,
     CFG_KEY_RADIO_REPLY_TIMEOUT,
     CFG_KEY_WAVELOG_API_CALL_TIMEOUT,
-    RADIO_DRIVER_FILE_PATH,
+    RADIO_DRIVER_FILE_PATH, CFG_KEY_RADIO_POLLING_INTERVAL,
 )
 from application.config_manager import ConfigManager
 from helpers.display_helper import DisplayHelper
@@ -75,7 +75,7 @@ class SetupManager:
         with open(SETUP_FILE_PATH, "r") as fp:
             setup_html = fp.read()
 
-        config = self._config_manager.read_config()
+        config = self._config_manager.get_config()
         
         # fix the value of radioDriverName so it is not empty string in on the setup page
         if not config.get(CFG_KEY_RADIO_DRIVER_NAME):
@@ -111,7 +111,7 @@ class SetupManager:
         radio_driver_temp_file_name = "radio_driver_file_buffer.tmp"
         radio_driver_file_buffer = open(radio_driver_temp_file_name, "wb")
         uploaded_radio_driver_file_name = None
-        config = self._config_manager.read_config()
+        config = self._config_manager.get_config()
         boundary = content_type.split("boundary=", 1)[1]
         parser = PushMultipartParser(boundary=boundary, content_length=content_length)
         
@@ -140,12 +140,13 @@ class SetupManager:
                         part._mark_complete()
                         if (
                             part.name == CFG_KEY_RADIO_REPLY_TIMEOUT
+                            or part.name == CFG_KEY_RADIO_POLLING_INTERVAL
                             or part.name == CFG_KEY_WAVELOG_API_CALL_TIMEOUT
                         ):
                             # replace decimal comma for point due to possible browser locale setting
-                            config[part.name] = str(part.value.replace(",", "."))
+                            config[part.name] = str(part.value.replace(",", ".")).strip()
                         else:
-                            config[part.name] = str(part.value)
+                            config[part.name] = str(part.value).strip()
                     
                     part = None  # free up the resources
         parser.close()

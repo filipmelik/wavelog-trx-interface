@@ -1,6 +1,11 @@
 import lib.async_http_server as tinyweb
 from application.config_manager import ConfigManager
-from application.constants import TOPIC_TRX_STATUS, CFG_KEY_RADIO_REPLY_TIMEOUT
+from application.constants import (
+    TOPIC_TRX_STATUS,
+    CFG_KEY_RADIO_REPLY_TIMEOUT,
+    CFG_KEY_GENERAL_API_SERVER_PORT,
+    CFG_KEY_XML_RPC_SERVER_PORT,
+)
 from application.wifi_manager import WifiManager
 
 from helpers.logger import Logger
@@ -26,7 +31,7 @@ class ApiServerTask:
         self._message_broker = message_broker
         self._omnirig_helper = omnirig_helper
         self._omnirig_command_executor = omnirig_command_executor
-        self._config = config_manager.read_config()
+        self._config = config_manager.get_config()
         self._queue = RingbufQueue(2)
 
         self.trx_status: TrxStatus = None
@@ -39,8 +44,14 @@ class ApiServerTask:
         """
         Run the general-purpose web server so this device can be controlled externally
         """
+        port = self._config[CFG_KEY_GENERAL_API_SERVER_PORT]
+        if not port:
+            self._logger.debug(
+                f"General API server will not be started, because port was not specified in device settings"
+            )
+            return
+        
         device_ip_address = self._wifi_manager.get_device_ip_address()
-        port = 54321 # todo this should be pulled out from config
         self._logger.debug(f"Starting general API server at {device_ip_address} port {port}")
         self._general_api_server = tinyweb.webserver()
         self._general_api_server.add_route('/qsy/<frequency>', self._qsy_request_handler, methods=['GET'])
@@ -58,8 +69,15 @@ class ApiServerTask:
         """
         Run the XML-RPC server for the "Cloudlog Offline" application
         """
+        port = self._config[CFG_KEY_XML_RPC_SERVER_PORT]
+        if not port:
+            self._logger.debug(
+                f"Cloudlog Offline XML-RPC server will not be started, "
+                f"because port was not specified in device settings"
+            )
+            return
+        
         device_ip_address = self._wifi_manager.get_device_ip_address()
-        port = 12345 # todo this should be pulled out from config
         self._logger.debug(
             f"Starting Cloudlog Offline XML-RPC server at {device_ip_address} port {port}"
         )
@@ -76,10 +94,15 @@ class ApiServerTask:
         """
         Stop the running tasks
         """
-        self._is_running = False
-        self._general_api_server.shutdown()
-        self._cloudlog_offline_xml_rpc_server.shutdown()
         self._message_broker.unsubscribe(topic=TOPIC_TRX_STATUS, agent=self._queue)
+        
+        # stop following only in case it is running
+        if self._general_api_server:
+            self._general_api_server.shutdown()
+        if self._cloudlog_offline_xml_rpc_server:
+            self._cloudlog_offline_xml_rpc_server.shutdown()
+            
+        self._is_running = False
     
     async def _qsy_request_handler(self, request, response, frequency_string):
         """

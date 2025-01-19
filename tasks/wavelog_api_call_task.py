@@ -2,8 +2,14 @@ import time
 import requests
 
 from application.config_manager import ConfigManager
-from application.constants import TOPIC_TRX_STATUS, API_HEARTBEAT_TIME, CFG_KEY_WAVELOG_API_KEY, CFG_KEY_RADIO_NAME, \
-    CFG_KEY_WAVELOG_API_CALL_TIMEOUT, CFG_KEY_WAVELOG_API_URL
+from application.constants import (
+    TOPIC_TRX_STATUS,
+    CFG_KEY_WAVELOG_API_KEY,
+    CFG_KEY_RADIO_NAME,
+    CFG_KEY_WAVELOG_API_CALL_TIMEOUT,
+    CFG_KEY_WAVELOG_API_URL,
+    CFG_KEY_WAVELOG_API_CALL_HEARTBEAT_TIME,
+)
 from helpers.logger import Logger
 from helpers.omnirig_helper import OmnirigHelper
 from lib.asyncio.broker import Broker
@@ -30,7 +36,7 @@ class WavelogApiCallTask:
         self._status_values_supported_by_trx = (
             self._omnirig_helper.get_status_values_supported_by_trx()
         )
-        self._config = config_manager.read_config()
+        self._config = config_manager.get_config()
         self._last_heartbeat_time = 0
         self._last_reported_mode = None
         self._last_reported_trx_tx_frequency = 0
@@ -45,8 +51,9 @@ class WavelogApiCallTask:
         async for topic, trx_status in self._queue:
             self._logger.debug(f"WavelogApiCallTask: received message: {str(trx_status)}")
             
+            heartbeat_seconds = int(self._config[CFG_KEY_WAVELOG_API_CALL_HEARTBEAT_TIME])
             heartbeat_threshold_passed = (
-                    (time.time() - self._last_heartbeat_time) > API_HEARTBEAT_TIME
+                    (time.time() - self._last_heartbeat_time) > heartbeat_seconds
             )
             if heartbeat_threshold_passed:
                 self._logger.debug("WavelogApiCallTask: heartbeat threshold passed")

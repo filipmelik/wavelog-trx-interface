@@ -1,7 +1,7 @@
 import network
 
 from application.config_manager import ConfigManager
-from application.constants import CFG_KEY_DNS_NAME, CFG_KEY_WIFI_PASS, CFG_KEY_WIFI_NAME
+from application.constants import CFG_KEY_WIFI_PASS, CFG_KEY_WIFI_NAME
 from helpers.logger import Logger
 
 
@@ -39,8 +39,7 @@ class WifiManager:
         """
         Setup wi-fi for station mode (as a client that will connect to the router)
         """
-        config = self._config_manager.read_config()
-        dhcp_hostname = config[CFG_KEY_DNS_NAME]
+        dhcp_hostname = self._config_manager.get_device_id()
         
         self._logger.debug(
             f"Activating wifi interface, setting to station mode "
@@ -54,7 +53,7 @@ class WifiManager:
         """
         Connect to wi-fi saved in config and block until connected
         """
-        config = self._config_manager.read_config()
+        config = self._config_manager.get_config()
         ssid = config[CFG_KEY_WIFI_NAME]
         password = config[CFG_KEY_WIFI_PASS]
         

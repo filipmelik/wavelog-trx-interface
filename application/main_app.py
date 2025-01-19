@@ -3,15 +3,15 @@ import time
 import os
 from application.config_manager import ConfigManager
 from application.constants import (
-    DEVICE_NAME,
+    DEFAULT_DEVICE_NAME,
     CFG_KEY_RADIO_DRIVER_NAME,
     CFG_KEY_WIFI_NAME,
     CFG_KEY_RADIO_BAUD_RATE,
     CFG_KEY_RADIO_DATA_BITS,
     CFG_KEY_RADIO_STOP_BITS,
     CFG_KEY_RADIO_PARITY,
-    SPLASH_SCREEN_WAIT_TIME,
     RADIO_DRIVER_FILE_PATH,
+    CFG_KEY_STARTUP_SCREEN_WAIT_TIME,
 )
 from application.setup_manager import SetupManager
 from application.wifi_manager import WifiManager
@@ -168,12 +168,14 @@ class MainApp:
         self._logger.debug("Starting websocket client task")
         websocket_client_task=WebsocketClientTask(
             logger=self._logger,
+            message_broker=self._message_broker,
+            omnirig_helper=self._omnirig_helper,
+            omnirig_command_executor=self._omnirig_command_executor,
+            config_manager=self._config_manager,
         )
         asyncio.create_task(websocket_client_task.run())
+        asyncio.create_task(websocket_client_task.run_trx_status_messages_subscriber())
         self._tasks_to_stop_when_setup_is_launched.append(websocket_client_task)
-
-        # todo server for cloudlog offline - conditional based on config?
-        # todo websocket client for wavelog bandlist???
         
         asyncio.get_event_loop().run_forever()
         
@@ -211,7 +213,7 @@ class MainApp:
         
         self._stop_tasks_that_dont_need_to_run_when_setup_is_launched()
         
-        access_point_ssid = DEVICE_NAME
+        access_point_ssid = DEFAULT_DEVICE_NAME
         self._logger.debug(f"Creating wi-fi access point with ssid '{access_point_ssid}'")
         device_ip_address = self._wifi_manager.create_wifi_access_point(
             essid=access_point_ssid
@@ -235,9 +237,9 @@ class MainApp:
         """
         Perform necessary initialization tasks
         """
-        config = self._config_manager.read_config()
-        self._display_splash_screen(config=config)
-        time.sleep(SPLASH_SCREEN_WAIT_TIME) # TODO configurable?
+        config = self._config_manager.get_config()
+        self._display_splash_screen(config_manager=self._config_manager)
+        time.sleep(int(config[CFG_KEY_STARTUP_SCREEN_WAIT_TIME]))
         
         self._logger.info("Setting up wi-fi")
         self._wifi_manager.setup_wifi_as_client()
@@ -248,7 +250,7 @@ class MainApp:
         """
         Check if radio driver was not yet set up by user on the setup screen
         """
-        config = config_manager.read_config()
+        config = config_manager.get_config()
         radio_driver_file_exists = RADIO_DRIVER_FILE_PATH in os.listdir()
         config_entry_exists = config.get(CFG_KEY_RADIO_DRIVER_NAME)
         return not radio_driver_file_exists or not config_entry_exists
@@ -296,10 +298,13 @@ class MainApp:
             f"{uart_baudrate}-{uart_bits}-{parity_str}-{uart_stop_bits}"
         )
     
-    def _display_splash_screen(self, config: dict):
+    def _display_splash_screen(self, config_manager: ConfigManager):
         """
         Display splash (startup) screen with some useful info
         """
+        config = config_manager.get_config()
+        device_id = config_manager.get_device_id()
+        
         uart_baudrate = int(config.get(CFG_KEY_RADIO_BAUD_RATE))
         uart_bits = int(config.get(CFG_KEY_RADIO_DATA_BITS))
         uart_stop_bits = int(config.get(CFG_KEY_RADIO_STOP_BITS))
@@ -313,7 +318,7 @@ class MainApp:
             parity = 'N'
         
         text_rows = [
-            DEVICE_NAME,
+            device_id,
             "",
             f"Radio: {config.get(CFG_KEY_RADIO_DRIVER_NAME)}",
             f"Wifi: {config.get(CFG_KEY_WIFI_NAME)}",

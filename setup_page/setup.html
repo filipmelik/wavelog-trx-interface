@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport\" content="width=device-width, initial-scale=1.0\">
+<title>Wavelog TRX Interface Setup</title>
+<style>
+body { font-family: Arial, sans-serif; }
+.container { margin: 0 auto; padding: 0 20px 20px 20px; }
+.section-container { border-radius: 15px; padding: 1em; max-width: 800px; width: 100%; background-color: #dddddd; margin-bottom: 2em; }
+input[type='text'], input[type='password'], input[type='number'], select { width: 97%; padding: 10px; margin: 5px 0 15px 0; }
+input[type='submit'] { width: 100%; padding: 25px; margin-top: 10px; background-color: #4CAF50; color: white; border: none; font-size: 25px; max-width: 830px; border-radius: 10px}
+.btn-reboot { width: 100%; padding: 10px; margin-top: 10px; background-color: #FF0000; color: white; border: none; }
+input[type='submit']:hover { background-color: #45a049; }
+h2 { margin: 0.2em 0 1em 0; }
+hr { margin-bottom: 1.5em; }
+</style>
+</head>
+<body>
+    <div class="container">
+    <h1>Wavelog TRX Interface Setup</h1>
+    <form action="/save" method="post" enctype="multipart/form-data">
+        <div class="section-container">
+            <h2>General settings</h2>
+            <label for="userCallsign">Your callsign:</label><br>
+            <input type="text" id="userCallsign" pattern="[a-zA-Z0-9]{2,10}" name="userCallsign" value="{{userCallsign}}" required><br>
+            <label for="radioName">Radio name:</label><br>
+            <input type="text" id="radioName" pattern="[a-zA-Z0-9\-_]{2,20}" name="radioName" value="{{radioName}}" required><br>
+            <label for="startupScreenWaitTime">Startup screen display time [seconds]:</label><br>
+            <input type="number" step="1" id="startupScreenWaitTime" name="startupScreenWaitTime" value="{{startupScreenWaitTime}}" required><br>
+        </div>
+
+        <div class="section-container">
+            <h2>Wi-Fi settings</h2>
+            <label for="wifiName">Wi-Fi name:</label><br>
+            <input type="text" id="wifiName" name="wifiName" value="{{wifiName}}" required><br>
+            <label for="wifiPass">Wi-Fi password:</label><br>
+            <input type="password" id="wifiPass" name="wifiPass" value="{{wifiPass}}" required><br>
+        </div>
+
+        <div class="section-container">
+            <h2>Radio CAT settings</h2>
+            <label for="radioBaudRate">Radio UART baud rate:</label><br>
+            <input type="number" id="radioBaudRate" name="radioBaudRate" value="{{radioBaudRate}}" required><br>
+            <label for="radioDataBits">Radio UART data bits:</label><br>
+            <input type="number" id="radioDataBits" name="radioDataBits" value="{{radioDataBits}}" required><br>
+            <label for="radioParity">Radio UART parity:</label><br>
+            <select id="radioParity" name="radioParity">
+                <option value="no">No parity</option>
+                <option value="odd">Odd</option>
+                <option value="even">Even</option>
+            </select><br>
+            <label for="radioStopBits">Radio UART stop bits:</label><br>
+            <input type="number" id="radioStopBits" name="radioStopBits" value="{{radioStopBits}}" required><br>
+            <hr>
+            <label for="radioPollingInterval">Radio polling interval [seconds]:</label><br>
+            <input type="number" step="any" id="radioPollingInterval" name="radioPollingInterval" value="{{radioPollingInterval}}" required><br>
+            <label for="radioReplyTimeout">Radio reply timeout [seconds]:</label><br>
+            <input type="number" step="any" id="radioReplyTimeout" name="radioReplyTimeout" value="{{radioReplyTimeout}}" required><br>
+            <hr>
+            <h2>Radio driver</h2>
+            <p>Currently loaded driver: <strong>{{radioDriverName}}</strong>. If you want to change it, select omnirig ini driver file to upload</p>
+
+            <label for="radioDriver">Select radio driver:</label><br>
+            <input type="file" id="radioDriver" name="radioDriver"><br>
+        </div>
+
+        <div class="section-container">
+            <h2>Wavelog API settings</h2>
+            <label for="wavelogApiUrl">Wavelog API Endpoint:</label><br>
+            <input type="text" id="wavelogApiUrl" name="wavelogApiUrl" value="{{wavelogApiUrl}}" required><br>
+            <label for="wavelogApiKey">Wavelog API Key:</label><br>
+            <input type="password" id="wavelogApiKey" name="wavelogApiKey" value="{{wavelogApiKey}}" required><br>
+            <label for="wavelogApiCallHeartbeatTime">API call heartbeat time [seconds]:</label><br>
+            <input type="number" step="1" id="wavelogApiCallHeartbeatTime" name="wavelogApiCallHeartbeatTime" value="{{wavelogApiCallHeartbeatTime}}" required><br>
+            <label for="wavelogApiCallTimeout">API call timeout [seconds]:</label><br>
+            <input type="number" step="any" id="wavelogApiCallTimeout" name="wavelogApiCallTimeout" value="{{wavelogApiCallTimeout}}" required><br>
+        </div>
+
+        <div class="section-container">
+            <h2>Cloudlog offline settings</h2>
+            <label for="xmlRpcServerPort">XML-RPC server port:</label><br>
+            <input type="number" step="1" id="xmlRpcServerPort" name="xmlRpcServerPort" value="{{xmlRpcServerPort}}"><br>
+        </div>
+
+        <div class="section-container">
+            <h2>Device API settings</h2>
+            <label for="generalApiServerPort">Device API server port:</label><br>
+            <input type="number" step="1" id="generalApiServerPort" name="generalApiServerPort" value="{{generalApiServerPort}}"><br>
+        </div>
+
+        <div class="section-container">
+            <h2>Websocket server settings</h2>
+            <label for="websocketServerEndpointUrl">Websocket server endpoint URL:</label><br>
+            <input type="text" id="websocketServerEndpointUrl" name="websocketServerEndpointUrl" value="{{websocketServerEndpointUrl}}"><br>
+        </div>
+
+        <input type="submit" value="Save config & reboot">
+    </form>
+
+    </div>
+</body>
+</html>

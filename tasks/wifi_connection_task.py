@@ -41,7 +41,7 @@ class WifiConnectionTask:
                 continue
                 
             self._logger.info("Wi-fi connected")
-            self._display_wifi_connected_message()
+            self._display_wifi_connected_message(wifi_manager=self._wifi_manager)
             time.sleep(WIFI_CONNECTED_SCREEN_WAIT_TIME)
             
             await asyncio.sleep_ms(200)
@@ -59,9 +59,9 @@ class WifiConnectionTask:
         text_rows = ["No wifi", "", "Connecting..."]
         self._display.display_text(text_rows)
     
-    def _display_wifi_connected_message(self):
+    def _display_wifi_connected_message(self, wifi_manager: WifiManager):
         """
         Display Wi-fi connected message
         """
-        text_rows = ["Wifi connected!"]
+        text_rows = ["Wifi connected!", "", f"IP: {wifi_manager.get_device_ip_address()}"]
         self._display.display_text(text_rows)

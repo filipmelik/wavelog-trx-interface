@@ -1,4 +1,4 @@
-import ssd1306
+from lib import ssd1306
 
 
 class DisplayHelper:

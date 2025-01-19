@@ -1,7 +1,7 @@
 import asyncio
-import ssd1306
+from lib import ssd1306
 from application.config_manager import ConfigManager
-from application.constants import DEVICE_NAME
+from application.constants import DEFAULT_DEVICE_NAME
 from application.main_app import MainApp
 from application.wifi_manager import WifiManager
 from helpers.display_helper import DisplayHelper
@@ -39,7 +39,7 @@ async def main():
     Main entrypoint
     """
     logger = Logger(log_level=LOG_LEVEL)
-    logger.info(f"Starting {DEVICE_NAME}")
+    logger.info(f"Starting {DEFAULT_DEVICE_NAME}")
     set_global_exception_handler()
     
     config_manager = ConfigManager()
@@ -79,7 +79,7 @@ async def main():
     else:
         logger.debug("Device was not yet configured, launching setup")
         logger.info("Starting up setup")
-        access_point_ssid = DEVICE_NAME
+        access_point_ssid = DEFAULT_DEVICE_NAME
         logger.debug(f"Creating wi-fi access point with ssid '{access_point_ssid}'")
         device_ip_address = wifi_manager.create_wifi_access_point(
             essid=access_point_ssid

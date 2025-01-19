@@ -31,7 +31,7 @@ class RigReadUartTask:
         self._uart = uart
         self._logger = logger
         self._message_broker = message_broker
-        self._config = config_manager.read_config()
+        self._config = config_manager.get_config()
         
         self._commands_to_execute = omnirig_helper.get_default_status_commands_of_interest()
         self._status_values_supported_by_trx = omnirig_helper.get_status_values_supported_by_trx()
