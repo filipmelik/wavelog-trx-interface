@@ -32,7 +32,7 @@ class WifiConnectionTask:
             try:
                 self._wifi_manager.connect_to_wifi()
             except:
-                # this resets internal wifi state and prevents errors when
+                # this resets internal wi-fi state and prevents errors when
                 #  device loses connection and is reconnecting
                 self._logger.debug(
                     "Got error when connecting to Wi-fi, disconnecting Wi-fi and will try again"
@@ -63,5 +63,5 @@ class WifiConnectionTask:
         """
         Display Wi-fi connected message
         """
-        text_rows = ["Wifi connected!", "", f"IP: {wifi_manager.get_device_ip_address()}"]
+        text_rows = ["Wifi connected!", "", "IP address: ",f"{wifi_manager.get_device_ip_address()}"]
         self._display.display_text(text_rows)
