@@ -39,7 +39,11 @@ class OmnirigHelper:
         logger: Logger,
     ):
         self._logger = logger
-        
+    
+    def setup(self):
+        """
+        Parse radio driver file and cache commands for future use
+        """
         # read all raw commands data from driver file
         parser = OmnirigConfigParser()
         all_commands_raw_data = parser.extract_all_commands_raw_data(
