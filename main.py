@@ -15,9 +15,9 @@ from lib.omnirig import OmnirigCommandExecutor, OmnirigValueDecoder, OmnirigValu
 LOG_LEVEL = Logger.DEBUG
 
 # Hardware configuration
-setup_button_pin = Pin(6, Pin.IN, Pin.PULL_UP)
+setup_button_pin = Pin(0, Pin.IN, Pin.PULL_UP)
 on_board_rgb_led_pin = Pin(48, Pin.OUT)
-i2c = SoftI2C(sda=Pin(1), scl=Pin(2))
+i2c = SoftI2C(sda=Pin(7), scl=Pin(6))
 oled_display = ssd1306.SSD1306_I2C(128, 64, i2c)
 on_board_rgb_led = NeoPixel(on_board_rgb_led_pin, 1) # 1 means one pixel
 uart = UART(2) # UART number 2
