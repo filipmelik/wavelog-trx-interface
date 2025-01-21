@@ -117,7 +117,10 @@ class MainApp:
         )
         asyncio.create_task(wifi_connection_task.run())
         self._tasks_to_stop_when_setup_is_launched.append(wifi_connection_task)
-
+        
+        self._logger.debug("Setting up TRX commands")
+        self._omnirig_helper.setup()
+        
         self._logger.debug("Starting rig status UART reader task")
         rig_read_uart_task = RigReadUartTask(
             uart=self._uart,
