@@ -44,8 +44,12 @@ async def main():
     
     config_manager = ConfigManager()
     omnirig_helper = OmnirigHelper(logger=logger)
-    wifi_manager = WifiManager(config_manager=config_manager, logger=logger)
     display_helper = DisplayHelper(oled_display=oled_display)
+    wifi_manager = WifiManager(
+        display=display_helper,
+        config_manager=config_manager,
+        logger=logger
+    )
     setup_manager = SetupManager(
         logger=logger,
         display=display_helper,
@@ -85,6 +89,8 @@ async def main():
             essid=access_point_ssid
         )
         setup_manager.display_setup_mode_active_message(
+            is_ap_setup_mode=True,
+            is_connected_to_wifi=wifi_manager.is_connected(),
             setup_server_ip_address=device_ip_address,
             ssid=access_point_ssid,
         )

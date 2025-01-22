@@ -26,11 +26,13 @@ class WifiConnectionTask:
                 await asyncio.sleep_ms(5000)
                 continue
             
-            # connect to wifi and intentionally block until connected by using "time.sleep"
-            self._logger.info("Connecting to Wi-fi")
-            self._display_wifi_reconnecting_message()
+            # reconnect to wi-fi and intentionally block until reconnected
+            self._logger.info("Reconnecting to Wi-fi")
+            self._wifi_manager.display_wifi_connecting_message()
             try:
-                self._wifi_manager.connect_to_wifi()
+                await self._wifi_manager.connect_to_wifi_and_wait_until_connected(
+                    blocking_wait_for_connect=True
+                )
             except:
                 # this resets internal wi-fi state and prevents errors when
                 #  device loses connection and is reconnecting
@@ -41,7 +43,7 @@ class WifiConnectionTask:
                 continue
                 
             self._logger.info("Wi-fi connected")
-            self._display_wifi_connected_message(wifi_manager=self._wifi_manager)
+            self._wifi_manager.display_wifi_connected_message()
             time.sleep(WIFI_CONNECTED_SCREEN_WAIT_TIME)
             
             await asyncio.sleep_ms(200)
@@ -51,17 +53,4 @@ class WifiConnectionTask:
         Stop the running task
         """
         self._is_running = False
-            
-    def _display_wifi_reconnecting_message(self):
-        """
-        Display Wi-fi connecting message
-        """
-        text_rows = ["No wifi", "", "Connecting..."]
-        self._display.display_text(text_rows)
-    
-    def _display_wifi_connected_message(self, wifi_manager: WifiManager):
-        """
-        Display Wi-fi connected message
-        """
-        text_rows = ["Wifi connected!", "", "IP address: ",f"{wifi_manager.get_device_ip_address()}"]
-        self._display.display_text(text_rows)
+        

@@ -107,6 +107,15 @@ class MainApp:
                 # in case radio driver is missing, intentionally block here so the
                 # only action user can take is pressing the button and launching the setup
                 await asyncio.sleep_ms(0)
+        
+        # wait until wi-fi is connected, but by using 'blocking_wait_for_connect=False'
+        # it also lets asyncio scheduler to handle the asyncio tasks called above this line
+        # especially the button handler task, which allows us to enter setup in case it
+        # is needed, for example to possibly correct the wi-fi username/password
+        self._wifi_manager.display_wifi_connecting_message()
+        await self._wifi_manager.connect_to_wifi_and_wait_until_connected(
+            blocking_wait_for_connect=False
+        )
                 
         # task that checks that device is connected to wifi and reconnect if not
         self._logger.debug("Starting wifi connection task")
@@ -198,10 +207,18 @@ class MainApp:
         device_ip_address = self._wifi_manager.get_device_ip_address()
         ssid = self._wifi_manager.get_device_ssid()
         self._setup_manager.display_setup_mode_active_message(
+            is_ap_setup_mode=False,
+            is_connected_to_wifi=self._wifi_manager.is_connected(),
             setup_server_ip_address=device_ip_address,
             ssid=ssid,
         )
-        await self._setup_manager.run_setup_server(device_ip_address=device_ip_address)
+        if self._wifi_manager.is_connected():
+            await self._setup_manager.run_setup_server(device_ip_address=device_ip_address)
+        else:
+            self._logger.debug(
+                'Not launching setup server, because device is not connected to wifi'
+            )
+            
     
     async def _wait_for_setup_button_long_press_event(
         self,
@@ -222,6 +239,8 @@ class MainApp:
             essid=access_point_ssid
         )
         self._setup_manager.display_setup_mode_active_message(
+            is_ap_setup_mode=True,
+            is_connected_to_wifi=self._wifi_manager.is_connected(),
             setup_server_ip_address=device_ip_address,
             ssid=access_point_ssid,
         )
