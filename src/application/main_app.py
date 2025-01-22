@@ -11,7 +11,7 @@ from application.constants import (
     CFG_KEY_RADIO_STOP_BITS,
     CFG_KEY_RADIO_PARITY,
     RADIO_DRIVER_FILE_PATH,
-    CFG_KEY_STARTUP_SCREEN_WAIT_TIME,
+    CFG_KEY_STARTUP_SCREEN_WAIT_TIME, WIFI_CONNECTED_SCREEN_WAIT_TIME,
 )
 from application.setup_manager import SetupManager
 from application.wifi_manager import WifiManager
@@ -116,9 +116,12 @@ class MainApp:
         await self._wifi_manager.connect_to_wifi_and_wait_until_connected(
             blocking_wait_for_connect=False
         )
+        self._logger.info("Wi-fi connected")
+        self._wifi_manager.display_wifi_connected_message()
+        time.sleep(WIFI_CONNECTED_SCREEN_WAIT_TIME)
                 
-        # task that checks that device is connected to wifi and reconnect if not
-        self._logger.debug("Starting wifi connection task")
+        # task that checks that device is connected to wi-fi and reconnects if not
+        self._logger.debug("Starting wi-fi connection task")
         wifi_connection_task = WifiConnectionTask(
             display=self._display,
             wifi_manager=self._wifi_manager,
