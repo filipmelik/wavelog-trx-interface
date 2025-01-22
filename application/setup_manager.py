@@ -52,17 +52,44 @@ class SetupManager:
         server.add_route('/reboot', self._reboot_handler, methods=['GET'])
         server.run(host='0.0.0.0', port=80, loop_forever=True)
         
-    def display_setup_mode_active_message(self, setup_server_ip_address: str, ssid: str):
+    def display_setup_mode_active_message(
+        self,
+        is_ap_setup_mode: bool,
+        is_connected_to_wifi: bool,
+        setup_server_ip_address: str,
+        ssid: str,
+    ):
         """
         Display on screen that setup mode is active along with info how to access it
         """
-        text_rows = [
-            "   SETUP MODE",
-            "Connect to WiFi:",
-            ssid,
-            "Open in browser:",
-            setup_server_ip_address,
-        ]
+        if is_ap_setup_mode:
+            screen_title = " AP SETUP MODE"
+            text_rows = [
+                screen_title,
+                "Connect to WiFi:",
+                ssid,
+                "Open in browser:",
+                setup_server_ip_address,
+            ]
+        else:
+            screen_title = "   SETUP MODE"
+            if is_connected_to_wifi:
+                text_rows = [
+                    screen_title,
+                    "Connect to WiFi:",
+                    ssid,
+                    "Open in browser:",
+                    setup_server_ip_address,
+                ]
+            else:
+                text_rows = [
+                    screen_title,
+                    "No WiFi",
+                    "Long press to",
+                    "launch AP Setup ",
+                    "mode",
+                ]
+            
         self._display.display_text(text_rows)
     
     async def _setup_page_handler(self, request, response):

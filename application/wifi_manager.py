@@ -1,7 +1,10 @@
+import asyncio
+
 import network
 
 from application.config_manager import ConfigManager
 from application.constants import CFG_KEY_WIFI_PASS, CFG_KEY_WIFI_NAME
+from helpers.display_helper import DisplayHelper
 from helpers.logger import Logger
 
 
@@ -9,7 +12,12 @@ class WifiManager:
     
     _wifi_station_interface: network.WLAN = None
     
-    def __init__(self, logger: Logger, config_manager: ConfigManager):
+    def __init__(
+        self, logger: Logger,
+        config_manager: ConfigManager,
+        display: DisplayHelper,
+    ):
+        self._display = display
         self._config_manager = config_manager
         self._logger = logger
         
@@ -49,10 +57,15 @@ class WifiManager:
         self._wifi_access_point_interface.active(False)
         self._wifi_station_interface.config(dhcp_hostname=dhcp_hostname)
     
-    def connect_to_wifi(self):
+    async def connect_to_wifi_and_wait_until_connected(
+        self,
+        blocking_wait_for_connect: bool,
+    ):
         """
-        Connect to wi-fi saved in config and block until connected
+        Connect to wi-fi saved in config and wait until connected
         """
+        self.disconnect_wifi()
+        
         config = self._config_manager.get_config()
         ssid = config[CFG_KEY_WIFI_NAME]
         password = config[CFG_KEY_WIFI_PASS]
@@ -61,7 +74,15 @@ class WifiManager:
         if not self._wifi_station_interface.isconnected():
             self._wifi_station_interface.connect(ssid, password)
             while not self._wifi_station_interface.isconnected():
-                pass
+                if blocking_wait_for_connect:
+                    # "forcibly" stay in the loop not giving asyncio
+                    #  scheduler chance to work on other running asyncio tasks
+                    pass
+                else:
+                    # stay in the loop until connected, but let scheduler
+                    # chance to work on other running asyncio tasks
+                    await asyncio.sleep_ms(100)
+                    
     
     def disconnect_wifi(self):
         """
@@ -71,7 +92,7 @@ class WifiManager:
             
     def is_connected(self) -> bool:
         """
-        Check if station (client) interface is connected to AP
+        Check if station (client) interface is connected to an AP (wireless router)
         """
         return self._wifi_station_interface.isconnected()
         
@@ -100,3 +121,30 @@ class WifiManager:
         Get signal strength of station (client) interface
         """
         return self._wifi_station_interface.status("rssi")
+    
+    def display_wifi_connecting_message(self):
+        """
+        Display Wi-fi connecting message
+        """
+        config = self._config_manager.get_config()
+        ssid = config[CFG_KEY_WIFI_NAME]
+        
+        text_rows = [
+            "No wifi",
+            "",
+            "Connecting:",
+            ssid,
+        ]
+        self._display.display_text(text_rows)
+    
+    def display_wifi_connected_message(self):
+        """
+        Display Wi-fi connected message
+        """
+        text_rows = [
+            "Wifi connected!",
+            "",
+            "IP address: ",
+            f"{self.get_device_ip_address()}"
+        ]
+        self._display.display_text(text_rows)
