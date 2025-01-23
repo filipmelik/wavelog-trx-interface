@@ -35,7 +35,7 @@ is missing in this list, raise the issue and we will add it here.
 - Icom IC-7300
 
 ### How to build the HW
-todo - per-rig level shifter instructions - possibly in separate wiki page 
+todo -  which esp32 boards are supported, per-rig level shifter instructions - possibly in separate wiki page 
 
 ### How to install firmware to the device
 todo esp webtool, esptool.py, maybe arduino/thonny?
