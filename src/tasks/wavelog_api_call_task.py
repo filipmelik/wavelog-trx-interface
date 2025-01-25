@@ -12,10 +12,10 @@ from application.constants import (
 )
 from helpers.logger import Logger
 from helpers.omnirig_helper import OmnirigHelper
+from helpers.status_led_helper import StatusLedHelper
 from lib.asyncio.broker import Broker
 from lib.asyncio.ringbuf_queue import RingbufQueue
 from lib.omnirig import TrxStatus
-from neopixel import NeoPixel
 
 
 class WavelogApiCallTask:
@@ -25,13 +25,13 @@ class WavelogApiCallTask:
         logger: Logger,
         config_manager: ConfigManager,
         omnirig_helper: OmnirigHelper,
-        neopixel: NeoPixel,
+        status_led_helper: StatusLedHelper,
         message_broker: Broker,
     ):
         self._logger = logger
         self._message_broker = message_broker
         self._omnirig_helper = omnirig_helper
-        self._neopixel = neopixel
+        self._status_led_helper = status_led_helper
         
         self._status_values_supported_by_trx = (
             self._omnirig_helper.get_status_values_supported_by_trx()
@@ -65,7 +65,7 @@ class WavelogApiCallTask:
                 self._logger.debug("WavelogApiCallTask: TRX status has changed")
             
             self._update_status_led(
-                neopixel=self._neopixel,
+                status_led_helper=self._status_led_helper,
                 radio_status_is_not_up_to_date=radio_status_is_not_up_to_date,
             )
             
@@ -135,18 +135,14 @@ class WavelogApiCallTask:
         r.close()
         
     def _update_status_led(
-            self,
-            neopixel: NeoPixel,
-            radio_status_is_not_up_to_date: bool,
+        self,
+        status_led_helper: StatusLedHelper,
+        radio_status_is_not_up_to_date: bool,
     ):
         if radio_status_is_not_up_to_date:
-            # radio status has changed and was not yet sent to API
-            neopixel[0] = (10, 0, 0)  # red, low brightness
+            status_led_helper.signal_api_radio_status_not_up_to_date()
         else:
-            # all data is up-to-date and was already sent to API
-            neopixel[0] = (0, 10, 0)  # green, low brightness
-        
-        neopixel.write()
+            status_led_helper.signal_api_radio_status_up_to_date()
     
     def _radio_status_is_not_up_to_date(self, trx_status: TrxStatus) -> bool:
         """
