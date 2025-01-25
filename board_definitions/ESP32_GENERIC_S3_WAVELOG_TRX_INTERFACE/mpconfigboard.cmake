@@ -7,3 +7,5 @@ set(SDKCONFIG_DEFAULTS
     boards/sdkconfig.spiram_sx
     boards/ESP32_GENERIC_S3/sdkconfig.board
 )
+
+set(MICROPY_FROZEN_MANIFEST ${MICROPY_BOARD_DIR}/manifest.py)

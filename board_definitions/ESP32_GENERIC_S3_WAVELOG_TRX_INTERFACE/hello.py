@@ -1,0 +1,2 @@
+def ahoj():
+    print("ahoj!")
