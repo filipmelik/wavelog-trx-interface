@@ -13,7 +13,8 @@ from application.constants import (
 from application.config_manager import ConfigManager
 from helpers.display_helper import DisplayHelper
 from helpers.logger import Logger
-from neopixel import NeoPixel
+from helpers.status_led_helper import StatusLedHelper
+
 
 class SetupManager:
     """
@@ -28,19 +29,19 @@ class SetupManager:
         logger: Logger,
         display: DisplayHelper,
         config_manager: ConfigManager,
-        neopixel: NeoPixel,
+        status_led_helper: StatusLedHelper,
     ):
         self._logger = logger
         self._display = display
         self._config_manager = config_manager
-        self._neopixel = neopixel
+        self._status_led_helper = status_led_helper
         
     async def run_setup_server(self, device_ip_address: str):
         """
         Run the setup web server
         """
         self._logger.debug(f"Starting setup web server at {device_ip_address}")
-        self._update_status_led(neopixel=self._neopixel)
+        self._status_led_helper.signal_setup_mode_active()
         server = tinyweb.webserver()
         server.add_route('/', self._setup_page_handler, methods=['GET'])
         server.add_route(
@@ -226,7 +227,3 @@ class SetupManager:
             "rebooting...",
         ]
         self._display.display_text(text_rows)
-    
-    def _update_status_led(self, neopixel: NeoPixel):
-        neopixel[0] = (10, 0, 10) # purple, low brightness
-        neopixel.write()

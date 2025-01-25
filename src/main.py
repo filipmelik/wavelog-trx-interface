@@ -1,26 +1,16 @@
 import asyncio
-from lib import ssd1306
 from application.config_manager import ConfigManager
 from application.constants import DEFAULT_DEVICE_NAME
 from application.main_app import MainApp
 from application.wifi_manager import WifiManager
+from board_config import BoardConfig
 from helpers.display_helper import DisplayHelper
 from helpers.omnirig_helper import OmnirigHelper
 from application.setup_manager import SetupManager
-from machine import UART, Pin, SoftI2C
-from neopixel import NeoPixel
 from helpers.logger import Logger
+from helpers.status_led_helper import StatusLedHelper
 from lib.omnirig import OmnirigCommandExecutor, OmnirigValueDecoder, OmnirigValueEncoder
 
-LOG_LEVEL = Logger.DEBUG
-
-# Hardware configuration
-setup_button_pin = Pin(0, Pin.IN, Pin.PULL_UP)
-on_board_rgb_led_pin = Pin(48, Pin.OUT)
-i2c = SoftI2C(sda=Pin(7), scl=Pin(6))
-oled_display = ssd1306.SSD1306_I2C(128, 64, i2c)
-on_board_rgb_led = NeoPixel(on_board_rgb_led_pin, 1) # 1 means one pixel
-uart = UART(2) # UART number 2
 
 def set_global_exception_handler():
     """
@@ -38,13 +28,16 @@ async def main():
     """
     Main entrypoint
     """
-    logger = Logger(log_level=LOG_LEVEL)
+    board_config = BoardConfig()
+    
+    logger = Logger(log_level=board_config.log_level)
     logger.info(f"Starting {DEFAULT_DEVICE_NAME}")
     set_global_exception_handler()
     
     config_manager = ConfigManager()
     omnirig_helper = OmnirigHelper(logger=logger)
-    display_helper = DisplayHelper(oled_display=oled_display)
+    display_helper = DisplayHelper(oled_display=board_config.oled_display)
+    status_led_helper = StatusLedHelper(on_board_rgb_led=board_config.on_board_rgb_led)
     wifi_manager = WifiManager(
         display=display_helper,
         config_manager=config_manager,
@@ -54,12 +47,12 @@ async def main():
         logger=logger,
         display=display_helper,
         config_manager=config_manager,
-        neopixel=on_board_rgb_led,
+        status_led_helper=status_led_helper,
     )
     omnirig_command_executor = OmnirigCommandExecutor(
         value_decoder=OmnirigValueDecoder(),
         value_encoder=OmnirigValueEncoder(),
-        uart=uart,
+        uart=board_config.uart,
         logger=logger,
     )
     
@@ -68,9 +61,10 @@ async def main():
         logger.debug("Device has existing config file, proceeding to normal startup")
         logger.info("Starting up main application")
         main_app = MainApp(
-            uart=uart,
-            setup_button_pin=setup_button_pin,
-            neopixel=on_board_rgb_led,
+            board_config=board_config,
+            uart=board_config.uart,
+            setup_button_pin=board_config.setup_button_pin,
+            status_led_helper=status_led_helper,
             logger=logger,
             display=display_helper,
             config_manager=config_manager,

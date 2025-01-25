@@ -15,11 +15,13 @@ from application.constants import (
 )
 from application.setup_manager import SetupManager
 from application.wifi_manager import WifiManager
+from board_config import BoardConfig
 from helpers.display_helper import DisplayHelper
 from helpers.logger import Logger
 from machine import UART, Pin
 
 from helpers.omnirig_helper import OmnirigHelper
+from helpers.status_led_helper import StatusLedHelper
 from lib.asyncio.broker import Broker
 from lib.omnirig import OmnirigCommandExecutor
 from tasks.button_read_task import ButtonReadTask
@@ -28,7 +30,6 @@ from tasks.api_server_task import ApiServerTask
 from tasks.garbage_collect_task import GarbageCollectTask
 from tasks.rig_read_uart_task import RigReadUartTask
 from tasks.wavelog_api_call_task import WavelogApiCallTask
-from neopixel import NeoPixel
 
 from tasks.websocket_client_task import WebsocketClientTask
 from tasks.wifi_connection_task import WifiConnectionTask
@@ -38,9 +39,10 @@ class MainApp:
     
     def __init__(
         self,
+        board_config: BoardConfig,
         uart: UART,
         setup_button_pin: Pin,
-        neopixel: NeoPixel,
+        status_led_helper: StatusLedHelper,
         logger: Logger,
         display: DisplayHelper,
         config_manager: ConfigManager,
@@ -49,9 +51,10 @@ class MainApp:
         omnirig_helper: OmnirigHelper,
         omnirig_command_executor: OmnirigCommandExecutor,
     ):
+        self._board_config = board_config
         self._uart = uart
         self._setup_button_pin = setup_button_pin
-        self._neopixel = neopixel
+        self._status_led_helper = status_led_helper
         self._logger = logger
         self._display = display
         self._config_manager = config_manager
@@ -160,7 +163,7 @@ class MainApp:
             logger=self._logger,
             config_manager=self._config_manager,
             omnirig_helper=self._omnirig_helper,
-            neopixel=self._neopixel,
+            status_led_helper=self._status_led_helper,
             message_broker=self._message_broker,
         )
         asyncio.create_task(wavelog_api_call_task.run())
@@ -317,6 +320,8 @@ class MainApp:
             bits=uart_bits,
             parity=parity,
             stop=uart_stop_bits,
+            tx=self._board_config.uart_tx_pin,
+            rx=self._board_config.uart_rx_pin,
         )
         self._logger.debug(
             f"UART for TRX communication configured with values from config: "

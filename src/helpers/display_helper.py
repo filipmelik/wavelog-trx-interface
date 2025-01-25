@@ -14,7 +14,7 @@ class DisplayHelper:
         """
         Display given text rows list on the display
         """
-        if not text_lines:
+        if not self._oled_display or not text_lines:
             return
         
         self._oled_display.fill(0)  # clear display
