@@ -1,0 +1,307 @@
+                               OMNI-RIG
+
+                      Rig Description file structure
+
+
+                         Alex Shovkoplyas, VE3NEA
+                           ve3nea@dxatlas.com
+
+
+
+
+1. FILE NAME
+
+The file name of a Rig Description file is the rig model name as it will appear
+in the configuration dialog. The extension must be ".ini".
+Example: "TS-570.ini".
+
+
+
+2. FILE STRUCTURE
+
+Rig Description files are standard Windows INI files, all ini syntax rules
+apply.
+
+
+
+3. SECTIONS
+
+Each rig control command is represented with a separate INI section. There are
+three types of commands.
+
+
+3.1. Initialization Commands
+
+Section name: [INIT], or [INITn] if there is more than one initialization
+command. "n" in the section name is the ordinal number of the command.
+
+Examples: [INIT], [INIT3].
+
+Initialization commands are sent to the transceiver as soon as a connection
+to the COM port is established. Their purpose is to force the desired initial
+state of the transceiver.
+
+
+3.2. Status Commands
+
+Section name: [STATUS] or [STATUSn]. These commands query the current state
+and operating parameters of the transceiver (frequency, mode, etc.).  The status
+commands are sent to the rig periodically, the polling interval can be changed
+in the configuration dialog. By default, all STATUS commands are sent to the rig
+every 500 ms.
+
+
+3.3. Set Parameter Commands
+
+Section name: the mnemonic code of the parameter, see the list of mnemonic codes
+in Section 4. Examples: [pmFreq], [pmRitOn].
+
+The commands of this type are sent to the transceiver only when the client
+application requests a change of an operating partameter.
+
+
+
+4. SUPPORTED PARAMETERS
+
+The following mnemonic codes of rig parameters are recognized by Omni-Rig:
+
+    pmFreq          operating frequency
+    pmFreqA         VFO A frequency
+    pmFreqB         VFO B frequency
+    pmPitch         CW pitch frequency
+    pmRitOffset     RIT offset frequency
+    pmRit0          Clear RIT - this is a write-only parameter
+    pmVfoAA         receive and transmit on VFO A
+    pmVfoAB         receive on VFO A, transmit on VFO B
+    pmVfoBA         receive on VFO B, transmit on VFO A
+    pmVfoBB         receive and transmit on VFO B
+    pmVfoA          receive on VFO A, transmit VFO unknown
+    pmVfoB          receive on VFO B, transmit VFO unknown
+    pmVfoEqual      copy the frequency of the receive VFO to the transmit VFO
+    pmVfoSwap       swap frequencies of the receive and transmit VFO's
+    pmSplitOn       enable split operation
+    pmSplitOff      disable split operation
+    pmRitOn         enable RIT
+    pmRitOff        disable RIT
+    pmXitOn         enable XIT
+    pmXitOff        disable XIT
+    pmRx            enable receive mode
+    pmTx            enable transmit mode
+    pmCW_U          CW mode, upper sideband
+    pmCW_L          CW mode, lower sideband
+    pmSSB_U         USB mode
+    pmSSB_L         LSB mode
+    pmDIG_U         Digital mode (RTTY, FSK, etc.), upper sideband
+    pmDIG_L         Digital mode, lower sideband
+    pmAM            AM mode
+    pmFM            FM mode
+
+Most transceivers support only a subset of these parameters.
+
+
+
+5. SECTION CONTENTS
+
+The following entries can appear in a section.
+
+5.1. Command
+
+This entry is mandatory, sections without Command are ignored. This is the
+command code that will be sent to the transceiver, either in text or hexadecimal
+format.
+
+Examples:
+
+Command=(MD3;)
+Command=000000020C
+
+Data formats are discussed in detail in Section 6.
+
+
+
+5.2. ReplyLength and ReplyEnd
+
+If the rig replies to the command, either ReplyLength or ReplyEnd must be
+specified. If both entries are missing or blank, Omni-Rig will not wait for
+a reply. Include ReplyLength if the number of bytes in the reply is known,
+or include ReplyEnd if the reply always ends with the same byte(s). If one of
+these entries is present in the command definition, Omni-Rig will receive
+and optionally validate the reply. The default reply timeout of 4000 ms can be
+changed in the configuration dialog.
+
+Examples:
+
+ReplyLength=0 ;do not wait for a reply
+ReplyLength=5 ;wait for a 5-byte reply
+
+ReplyEnd=     ;do not wait for a reply
+ReplyEnd=(;)  ;wait for a reply that ends with ";"
+ReplyEnd=FD   ;wait for a reply that ends with 0xFD
+
+
+5.3. Validate
+
+This entry defines a validation rule that will be applied to the received reply.
+Syntax:
+
+Validate=[<mask>|]<bits>
+
+Omni-Rig performs a bitwise AND operation on the transceiver reply and <mask>
+and then compares the result to <bits>. If <mask> is omitted, it will be
+constructed from <bits>. Please see Section 7 for a detailed description of mask
+formats.
+
+
+5.4. Value
+
+The Value entry is included in the sections of type Set Parameter Command for
+the commands that require a numeric parameter, such as pmFreqA (set frequency
+of VFO A). This entry specifies how the value is embedded in the command code.
+
+Syntax:
+
+Value=<start_pos>|<length>|<format>|<multiply>|<add>
+
+The numeric value of the parameter that the client application passed to
+Omni-Rig is multiplied by the <multiply> constant, then the <add> constant
+is added, and the result is converted to a sequence of bytes of length <length>
+in the <format> format. The bytes will be copied to the command (defined
+in the Command entry) starting at <start_pos>, position indexing is 0-based.
+The list of allowed values of <format> is provided in Section 8.
+
+
+Examples:
+
+Value=0|4|vfBcdLU|0.1|0
+Value=2|2|vfText|0.02|-8
+
+
+
+5.5. ValueN
+
+ValueN entries, where N is the ordinal number of the entry, are included in the
+STATUS sections and define how a numeric value is extracted from the transceiver
+reply. The syntax is similar to that of the Value entry, except that there is
+an additional field that specifies which parameter is extracted:
+
+
+ValueN=<start_pos>|<length>|<format>|<multiply>|<add>|<param>
+
+
+When Omni-Rig receives a reply from the transceiver, it takes <length> bytes,
+starting at <start_pos>, and converts then to a numeric value according to
+<format>. The result is then multiplied by the <multiply> constant, and
+the <add> constant is added, to produce the final output value.
+
+Examples:
+
+Value1=1|4|vfBinB|0.625|0|pmFreqA
+Value1=2|2|vfText|50|400|pmPitch
+
+
+
+5.6. FlagN
+
+FlagN entries, where N is the ordinal number of the entry, are included in the
+STATUS sections and define how a numeric value is extracted from the transceiver
+reply. Syntax:
+
+FlagN=[<mask>|]<bits>|<param>
+
+Omni-Rig performs a bitwise AND operation on the transceiver reply and <mask>
+and, if the result is equal to <bits>, assumes that the <param> parameter
+is enabled. Mask formats are described in Section 7.
+
+Examples:
+
+Flag1=110000000000|000000000000|pmVfoAA
+Flag2=(.......................1..............)|pmRitOn
+
+
+
+6. DATA FORMATS
+
+Values of the Command, ReplyEnd, Validate/<mask>, Validate/<bits>, FlagN/<mask>
+and FlagN/<bits> may be specified in the text or hexadecimal format.
+
+
+6.1. Text format
+
+String of characters in brackets. Example: (TEXT)
+
+
+6.2. Hexadecimal format
+
+String of hex-encoded bytes, with optional dots between the bytes.
+Examples:
+
+54455854
+54.45.58.54
+
+Note that these two examples define the same sequence of bytes as the example
+in Section 6.1.
+
+
+7. MASK FORMATS
+
+Bit extraction and validation rules are specified in the Validate and FlagN
+entries as <mask>|<bits>. The formats of <mask> and <bits> fields are described
+in Section 6. The <mask> field is optional; if omitted, it will be constructed
+from <bits> as follows.
+
+
+7.1. If <bits> is in the hexadecimal format and <mask> is omitted,
+then <bits> is copied to <mask> and all non-zero bytes are replaced in <mask>
+with 0xFF.
+
+Example:
+
+Validate=FEFE0064FBFD  is equivalent to  Validate=FFFF00FFFFFF|FEFE0064FBFD
+
+
+7.2. If <bits> is in the text format and <mask> is omitted, then <bits>
+is copied to <mask>, all "." characters in <mask> are replaced with 0xFF,
+and all "." characters in <bits> are replaced with the ASC(0) character.
+
+Example:
+
+Validate=(PT..;)  is equivalent to   Validate=FFFF0000FF|505400003B
+
+
+
+8. NUMERIC VALUE FORMATS
+
+The following mnemonic codes are allowed in the <format> field of the Value and
+ValueN entries:
+
+    vfText   asc codes of digits
+    vfBinL   integer, little endian
+    vfBinB   integer, big endian
+    vfBcdLU  BCD, little endian, unsigned
+    vfBcdLS  BCD, little endian, signed; the sign is in the MSB byte (0x00 or 0xFF)
+    vfBcdBU  big endian, unsigned
+    vfBcdBS  big endian, signed
+    vfYaesu  special format used by Yaesu
+
+
+These examples show the values of 123 and -123 converted to
+a sequence of 4 bytes according to different formats:
+
+
+Value:       123          -123
+----------------------------------
+vfText   30.31.32.33   2D.31.32.33
+vfBinL   7B.00.00.00   85.FF.FF.FF
+vfBinB   00.00.00.7B   FF.FF.FF.85
+vfBcdLU  23.01.00.00   n/a
+vfBcdLS  23.01.00.00   23.01.00.FF
+vfBcdBU  00.00.01.23   n/a
+vfBcdBS  00.00.01.23   FF.00.01.23
+vfYaesu  00.00.00.7B   80.00.00.7B
+
+
+
+
+
+
+------end of document--------
