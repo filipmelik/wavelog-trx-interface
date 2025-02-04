@@ -44,13 +44,13 @@ is missing in this list, raise the issue and we will add it here.
 
 - Icom IC-7300
 
-### How to build the HW
+## How to build the HW
 For instructions how to build the device, see the dedicated [Wiki page](https://github.com/filipmelik/wavelog-trx-interface/wiki/Hardware).
 
-### How to install firmware to the device
+## How to install firmware to the device
 For instructions where to get and how to flash the firmware, see the dedicated [Wiki page](https://github.com/filipmelik/wavelog-trx-interface/wiki/Firmware-How%E2%80%90To).
 
-### Possible future plans
+## Possible future plans
 - It would be cool to have custom hardware board :)
 
 
