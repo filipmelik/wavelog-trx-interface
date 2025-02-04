@@ -24,6 +24,5 @@ jobs:
         python-version: "3.10"
     - name: Tests
       run: |
-        pwd
-        ls -lah
+        ls -lah &&
         python src/tests.py
