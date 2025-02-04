@@ -24,4 +24,4 @@ jobs:
         python-version: "3.10"
     - name: Tests
       run: |
-        python tests.py
+        python src/tests.py
