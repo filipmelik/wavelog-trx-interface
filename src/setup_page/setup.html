@@ -46,9 +46,9 @@ hr { margin-bottom: 1.5em; }
             <input type="number" id="radioDataBits" name="radioDataBits" value="{{radioDataBits}}" required><br>
             <label for="radioParity">Radio UART parity:</label><br>
             <select id="radioParity" name="radioParity">
-                <option value="no">No parity</option>
-                <option value="odd">Odd</option>
-                <option value="even">Even</option>
+                <option value="no" {{noParitySelectedPlaceholder}}>No parity</option>
+                <option value="odd" {{oddParitySelectedPlaceholder}}>Odd</option>
+                <option value="even" {{evenParitySelectedPlaceholder}}>Even</option>
             </select><br>
             <label for="radioStopBits">Radio UART stop bits:</label><br>
             <input type="number" id="radioStopBits" name="radioStopBits" value="{{radioStopBits}}" required><br>

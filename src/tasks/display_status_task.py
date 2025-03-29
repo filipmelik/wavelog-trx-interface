@@ -89,12 +89,24 @@ class DisplayStatusTask:
             wlan_human_readable = f"Fair ({wlan_strength})"
         else:
             wlan_human_readable = f"Poor ({wlan_strength})"
-        
-        text_rows = [
-            f"RX f: {rx_freq_string}",
-            f"TX f: {tx_freq_string}",
-            f"Mode: {mode_string}",
-            f"Power: {power_string}",
-            f"Wifi: {wlan_human_readable}",
-        ]
+            
+        if (
+            current_rx_frequency
+            and current_tx_frequency != current_rx_frequency
+        ):
+            # display rx freq only when we have it and only when it differs from TX freq
+            text_rows = [
+                f"RX f: {rx_freq_string}",
+                f"TX f: {tx_freq_string}",
+                f"Mode: {mode_string}",
+                f"Power: {power_string}",
+                f"Wifi: {wlan_human_readable}",
+            ]
+        else:
+            text_rows = [
+                f"Freq: {tx_freq_string}",
+                f"Mode: {mode_string}",
+                f"Power: {power_string}",
+                f"Wifi: {wlan_human_readable}",
+            ]
         self._display.display_text(text_lines=text_rows)

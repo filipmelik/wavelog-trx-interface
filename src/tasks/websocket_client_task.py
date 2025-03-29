@@ -99,19 +99,23 @@ class WebsocketClientTask:
         command = decoded.get("command")
         params = decoded.get("params")
         
-        if command == "qsy":
+        if command == "qsy" or command == "qsy_with_mode":
             frequency = params.get("frequency")
-            await self._perform_qsy(frequency=frequency)
+            mode = params.get("mode")
+            await self._perform_qsy(frequency=frequency, mode=mode)
         else:
             error_message = f"WebsocketClient: unknown command received: '{command}'"
             self._logger.exception(error_message)
             raise Exception(error_message)
         
-    async def _perform_qsy(self, frequency: int):
+    async def _perform_qsy(self, frequency: int, mode: str):
         """
-        Perform QSY to given frequency
+        Perform QSY to given frequency, optionally with mode change
         """
-        self._logger.debug(f"WebsocketClient: QSY to {frequency}")
+        log_message = f"WebsocketClient: QSY to {frequency}"
+        if mode:
+            log_message += f" + {mode} mode change"
+        self._logger.debug(log_message)
         
         if not self.trx_status:
             # failsafe
@@ -121,24 +125,53 @@ class WebsocketClientTask:
             return
         
         # actual qsy code
-        cmd = self._omnirig_helper.get_frequency_set_command_for_currently_active_vfo(
+        freq_set_cmd = self._omnirig_helper.get_frequency_set_command_for_currently_active_vfo(
             trx_status=self.trx_status
         )
-        if not cmd:
+        if not freq_set_cmd:
             self._logger.info(
                 "ApiServerTask: QSY API request handler - TRX status not ready "
-                "or command for setting frequency not supported, nothing to do"
+                "or command for setting frequency not supported"
+            )
+        
+        mode_set_cmd = None
+        mode_set_success = False
+        if mode:
+            mode_set_cmd = self._omnirig_helper.get_mode_set_command_for_requested_mode(
+                requested_mode=mode
+            )
+            if not mode_set_cmd:
+                self._logger.info(
+                    "ApiServerTask: QSY API request handler - TRX status not ready "
+                    "or command for setting mode not supported"
+                )
+                mode_set_success = False
+            else:
+                mode_set_success = await self._omnirig_command_executor.execute_write_command(
+                    cmd=mode_set_cmd,
+                    value=None,  # intentional - "set mode" command do not have parameter
+                    reply_timeout_secs=float(self._config[CFG_KEY_RADIO_REPLY_TIMEOUT]),
+                )
+        
+        if not mode_set_cmd and not freq_set_cmd:
+            self._logger.info(
+                "ApiServerTask: QSY API request handler - TRX status not ready "
+                "or both needed commands are probably not supported. Nothing to do."
             )
             return
         
-        success = await self._omnirig_command_executor.execute_write_command(
-            cmd=cmd,
+        qsy_success = await self._omnirig_command_executor.execute_write_command(
+            cmd=freq_set_cmd,
             value=frequency,
             reply_timeout_secs=float(self._config[CFG_KEY_RADIO_REPLY_TIMEOUT]),
         )
         
-        if success:
+        if qsy_success and mode_set_success:
+            self._logger.debug(f"WebsocketClient: QSY to {frequency} {mode} successful")
+        elif qsy_success:
             self._logger.debug(f"WebsocketClient: QSY to {frequency} successful")
+        elif mode_set_success:
+            self._logger.debug(f"WebsocketClient: Mode {mode} set successful")
         else:
             self._logger.debug(f"WebsocketClient: QSY to {frequency} failed")
     

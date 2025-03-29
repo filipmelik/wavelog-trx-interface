@@ -21,14 +21,12 @@ class RigReadUartTask:
     
     def __init__(
         self,
-        uart: UART,
         logger: Logger,
         config_manager: ConfigManager,
         message_broker: Broker,
         omnirig_helper: OmnirigHelper,
         omnirig_command_executor: OmnirigCommandExecutor,
     ):
-        self._uart = uart
         self._logger = logger
         self._message_broker = message_broker
         self._config = config_manager.get_config()
@@ -49,7 +47,7 @@ class RigReadUartTask:
                 trx_status = await self._read_trx_status()
                 self._message_broker.publish(topic=TOPIC_TRX_STATUS, message=trx_status)
             except Exception as e:
-                self._logger.exception(str(e))
+                self._logger.exception(f"{type(e)}:{str(e)}")
                 
             await asyncio.sleep_ms(radio_polling_interval_ms)
             

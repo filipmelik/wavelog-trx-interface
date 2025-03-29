@@ -138,7 +138,6 @@ class MainApp:
         
         self._logger.debug("Starting rig status UART reader task")
         rig_read_uart_task = RigReadUartTask(
-            uart=self._uart,
             logger=self._logger,
             config_manager=self._config_manager,
             omnirig_helper=self._omnirig_helper,
@@ -322,6 +321,8 @@ class MainApp:
             stop=uart_stop_bits,
             tx=self._board_config.uart_tx_pin,
             rx=self._board_config.uart_rx_pin,
+            # todo make this configurable in setup html
+            # invert=UART.INV_TX | UART.INV_RX,
         )
         self._logger.debug(
             f"UART for TRX communication configured with values from config: "

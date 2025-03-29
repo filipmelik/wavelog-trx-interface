@@ -120,16 +120,23 @@ class OmnirigBaseCommand:
         if self.command_has_reply_length:
             self.reply_length = int(reply_length)
         
-        self.reply_end = command_raw_data.get('ReplyEnd')
+        raw_reply_end = command_raw_data.get('ReplyEnd')
         self.command_has_reply_end = (
-                self.reply_end is not None
-                and self.reply_end != ""
+                raw_reply_end is not None
+                and raw_reply_end != ""
         )
+        if self.command_has_reply_end:
+            self.reply_end = (
+                self._get_text_between_parentheses(text=raw_reply_end)
+                if self.command_data_type == OmnirigBaseCommand.DATA_TYPE_TEXT
+                else raw_reply_end
+            )
+            
         self.reply_end_data_type = None
         if self.command_has_reply_end:
             self.reply_end_data_type = (
                 OmnirigStatusCommand.DATA_TYPE_TEXT
-                if self._is_text_command_or_reply(data=self.reply_end)
+                if self._is_text_command_or_reply(data=raw_reply_end)
                 else OmnirigStatusCommand.DATA_TYPE_BIN
             )
         
@@ -230,13 +237,13 @@ class OmnirigStatusCommand(OmnirigBaseCommand):
     def _prepare_command_values_retrieved(
         self,
         value_entries: dict,
-        flag_entries: dict,
+        flag_entries: list,
     ) -> set:
         command_values = set()
         for value_name, _ in value_entries.items():
             command_values.add(value_name)
-        for flag_name, _ in flag_entries.items():
-            command_values.add(flag_name)
+        for flag_data in flag_entries:
+            command_values.add(flag_data["name"])
             
         return command_values
     
@@ -260,9 +267,9 @@ class OmnirigStatusCommand(OmnirigBaseCommand):
         
         return entries
     
-    def _collect_flag_entries(self, command_data: dict) -> dict:
+    def _collect_flag_entries(self, command_data: dict) -> list:
         _re_is_flag_entry = re.compile(r"^Flag(\d+)$")
-        entries = {}
+        entries = []
         for key, val in command_data.items():
             if _re_is_flag_entry.match(key) is not None:
                 value_parts = val.rsplit("|", 1)
@@ -282,7 +289,13 @@ class OmnirigStatusCommand(OmnirigBaseCommand):
                         flag_mask = self._create_mask_for_bin_data(data=data)
                         flag_bits = self._remove_dots_from_bin_encoded_data(data=data)
                 
-                entries[flag_name] = {"name": flag_name, "mask": flag_mask, "bits": flag_bits}
+                entries.append(
+                    {
+                        "name": flag_name,
+                        "mask": flag_mask,
+                        "bits": flag_bits,
+                     }
+                )
         
         return entries
 
@@ -590,6 +603,7 @@ class OmnirigCommandExecutor:
         self._value_encoder = value_encoder
         self._uart = uart
         self._logger = logger
+        self._is_executing_command = False
     
     
     async def execute_values_read_command(
@@ -615,14 +629,24 @@ class OmnirigCommandExecutor:
         
         # process flags
         results = {}
-        for flag_name, flag_data in cmd.flag_entries.items():
+        for flag_data in cmd.flag_entries:
+            flag_name = flag_data["name"]
             masked_flag = self._bytes_and(
                 a=trx_reply_buffer,
                 b=bytes.fromhex(flag_data["mask"]),
             )
             expected_value = bytes.fromhex(flag_data["bits"])
             flag_value = masked_flag == expected_value
-            results[flag_name] = flag_value
+            
+            if flag_name not in results:
+                # flag not yet in results - add it
+                results[flag_name] = flag_value
+            elif results[flag_name] == False and flag_value == True:
+                # flag is already in results, its value is False,
+                # but we now got same flag with True value -so overwrite the False to True.
+                # this handles the case when some flags are present multiple times
+                # in radio driver file - let's honor the True value here.
+                results[flag_name] = flag_value
         
         # process values
         for value_name, value_entry in cmd.value_entries.items():
@@ -674,6 +698,15 @@ class OmnirigCommandExecutor:
         Execute given command. Can be either READ or WRITE command.
         Returns tuple: (Success, TRX Reply data)
         """
+        while self._is_executing_command:
+            # if another command is being executed, wait until its execution finishes
+            self._logger.debug(
+                "Another command is being executed, waiting for its completion..."
+            )
+            await asyncio.sleep_ms(20)
+            
+        self._is_executing_command = True
+        
         _ = uart.read()  # read and discard everything in UART buffer prior to sending command
         
         if cmd.command_type == OmnirigBaseCommand.COMMAND_TYPE_READ:
@@ -683,16 +716,26 @@ class OmnirigCommandExecutor:
         elif cmd.command_type == OmnirigBaseCommand.COMMAND_TYPE_WRITE:
             # prepare WRITE command
             if value:
-                # command contains a value. We need to encode it a put in on correct
+                # command contains a value. We need to encode it and put in on correct
                 # position in original "write command template"
                 encoded_value = self._value_encoder.encode_value(
                     value_format=cmd.value_entry.format,
                     value=value,
                     target_bytes_length=cmd.value_entry.length
                 )
-                prepared_command = cmd.command[0:(2 * cmd.value_entry.start_pos)]
-                prepared_command += encoded_value
-                prepared_command += cmd.command[(2 * cmd.value_entry.start_pos + 2 * cmd.value_entry.length):]
+                if cmd.command_data_type == OmnirigBaseCommand.DATA_TYPE_BIN:
+                    prepared_command = cmd.command[0:(2 * cmd.value_entry.start_pos)]
+                    prepared_command += encoded_value
+                    prepared_command += cmd.command[(2 * cmd.value_entry.start_pos + 2 * cmd.value_entry.length):]
+                elif cmd.command_data_type == OmnirigBaseCommand.DATA_TYPE_TEXT:
+                    prepared_command = cmd.command[0:cmd.value_entry.start_pos]
+                    prepared_command += bytes.fromhex(encoded_value).decode()
+                    prepared_command += cmd.command[(cmd.value_entry.start_pos + cmd.value_entry.length):]
+                else:
+                    error_message = f"Unknown command data type: {cmd.command_data_type}"
+                    self._logger.exception(error_message)
+                    self._is_executing_command = False
+                    raise Exception(error_message)
             else:
                 # write command has no value, use the "write command template" as-is
                 prepared_command = cmd.command
@@ -702,21 +745,23 @@ class OmnirigCommandExecutor:
         else:
             error_message = f"Unknown command type: {cmd.command_type}"
             self._logger.exception(error_message)
+            self._is_executing_command = False
             raise Exception(error_message)
         
         self._debug_log(execute_debug_message)
         if cmd.command_data_type == OmnirigBaseCommand.DATA_TYPE_BIN:
             uart.write(bytes.fromhex(command_to_execute))
         elif cmd.command_data_type == OmnirigBaseCommand.DATA_TYPE_TEXT:
-            # todo this needs to be tested, as I do not have rig with text command support
             uart.write(command_to_execute)
         else:
             error_message = f"Unknown command data type: {cmd.command_data_type}"
             self._logger.exception(error_message)
+            self._is_executing_command = False
             raise Exception(error_message)
         
         should_wait_for_reply = cmd.command_has_reply_length or cmd.command_has_reply_end
         if not should_wait_for_reply:
+            self._is_executing_command = False
             return True, {}
         
         # wait for reply from trx with timeout
@@ -730,10 +775,27 @@ class OmnirigCommandExecutor:
                 trx_reply_buffer.extend(chunk)
             
             if cmd.command_has_reply_length and len(trx_reply_buffer) == cmd.reply_length:
-                reply_not_received = False
+                reply_not_received = False  # we have received the expected reply length
+                
             if cmd.command_has_reply_end:
-                # todo I do not have rig of this type to test ReplyEnd
-                pass
+                if cmd.reply_end_data_type == OmnirigStatusCommand.DATA_TYPE_TEXT:
+                    try:
+                        if (
+                            len(trx_reply_buffer) > len(cmd.reply_end)
+                            and trx_reply_buffer[-len(cmd.reply_end):].decode() == cmd.reply_end
+                        ):
+                            reply_not_received = False # we have received the expected text reply end
+                    except UnicodeError:
+                        pass  # decoding failed due to some non-text data in buffer = skip for now
+                elif cmd.reply_end_data_type == OmnirigStatusCommand.DATA_TYPE_BIN:
+                    # todo I do not have rig of this type to test binary ReplyEnd
+                    pass
+                else:
+                    error_message = f"Unsupported cmd reply end data type: {cmd.reply_end_data_type}"
+                    self._logger.exception(error_message)
+                    self._is_executing_command = False
+                    raise Exception(error_message)
+                
             elapsed_ns = time.time_ns() - start_time
             if elapsed_ns > (reply_timeout_secs * 10 ** 9):
                 self._debug_log("Timeout waiting for TRX reply")
@@ -741,17 +803,33 @@ class OmnirigCommandExecutor:
             await asyncio.sleep(0)
         
         if not trx_reply_buffer:
+            self._is_executing_command = False
             return False, {}
+        
+        if cmd.command_data_type == OmnirigBaseCommand.DATA_TYPE_BIN:
+            self._debug_log(f"TRX reply: {trx_reply_buffer.hex()}")
+        elif cmd.command_data_type == OmnirigBaseCommand.DATA_TYPE_TEXT:
+            try:
+                self._debug_log(f'TRX reply: "{trx_reply_buffer.decode()}"')
+            except UnicodeError:
+                # non-text data received, interpret it as hex
+                self._debug_log(f"TRX reply: {trx_reply_buffer.hex()}")
+        else:
+            error_message = f"Unknown command data type: {cmd.command_data_type}"
+            self._logger.exception(error_message)
+            self._is_executing_command = False
+            raise Exception(error_message)
         
         is_valid_reply = self._is_valid_trx_reply_for_command(
             command=cmd, trx_reply=trx_reply_buffer
         )
-        self._debug_log(f"TRX reply: {trx_reply_buffer.hex()}")
         self._debug_log(f"Is valid reply: {str(is_valid_reply)}")
         
         if not is_valid_reply:
+            self._is_executing_command = False
             return False, {}
         
+        self._is_executing_command = False
         return True, trx_reply_buffer
     
     def _is_valid_trx_reply_for_command(self, command: OmnirigBaseCommand, trx_reply):

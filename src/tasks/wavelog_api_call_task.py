@@ -120,9 +120,9 @@ class WavelogApiCallTask:
         Perform and Wavelog API call to report the current TRX status
         """
         payload = {
-            'mode_rx': mode,
+            'mode_rx': mode if rx_freq and rx_freq != tx_freq else None,
             'mode': mode,
-            'frequency_rx': str(rx_freq),
+            'frequency_rx': str(rx_freq) if rx_freq != tx_freq else None,
             'key': config[CFG_KEY_WAVELOG_API_KEY],
             'power': None if rf_power is None else rf_power,
             'frequency': str(tx_freq),

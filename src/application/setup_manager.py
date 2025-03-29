@@ -8,7 +8,9 @@ from application.constants import (
     CFG_KEY_RADIO_DRIVER_NAME,
     CFG_KEY_RADIO_REPLY_TIMEOUT,
     CFG_KEY_WAVELOG_API_CALL_TIMEOUT,
-    RADIO_DRIVER_FILE_PATH, CFG_KEY_RADIO_POLLING_INTERVAL,
+    RADIO_DRIVER_FILE_PATH,
+    CFG_KEY_RADIO_POLLING_INTERVAL,
+    CFG_KEY_RADIO_PARITY,
 )
 from application.config_manager import ConfigManager
 from helpers.display_helper import DisplayHelper
@@ -112,7 +114,26 @@ class SetupManager:
         # replace variable placeholders in setup html file with actual config values
         for key, val in config.items():
             setup_html = setup_html.replace(f"{{{{{key}}}}}", str(val))
-
+            
+        # handle pre-selection in uart parity selectbox
+        uart_parity = config.get(CFG_KEY_RADIO_PARITY)
+        if uart_parity == "no":
+            setup_html = setup_html.replace("{{noParitySelectedPlaceholder}}", "selected")
+            setup_html = setup_html.replace("{{oddParitySelectedPlaceholder}}", "")
+            setup_html = setup_html.replace("{{evenParitySelectedPlaceholder}}", "")
+        elif uart_parity == "odd":
+            setup_html = setup_html.replace("{{noParitySelectedPlaceholder}}", "")
+            setup_html = setup_html.replace("{{oddParitySelectedPlaceholder}}", "selected")
+            setup_html = setup_html.replace("{{evenParitySelectedPlaceholder}}", "")
+        elif uart_parity == "even":
+            setup_html = setup_html.replace("{{noParitySelectedPlaceholder}}", "")
+            setup_html = setup_html.replace("{{oddParitySelectedPlaceholder}}", "")
+            setup_html = setup_html.replace("{{evenParitySelectedPlaceholder}}", "selected")
+        else:
+            setup_html = setup_html.replace("{{noParitySelectedPlaceholder}}", "")
+            setup_html = setup_html.replace("{{oddParitySelectedPlaceholder}}", "")
+            setup_html = setup_html.replace("{{evenParitySelectedPlaceholder}}", "")
+        
         await response.send(setup_html)
         
     async def _save_config_handler(self, request, response):

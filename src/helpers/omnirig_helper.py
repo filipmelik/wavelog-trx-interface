@@ -107,6 +107,12 @@ class OmnirigHelper:
 
         return value_set_commands.get(command_name)
     
+    def get_mode_set_command_for_requested_mode(self, requested_mode: str):
+        value_set_commands = self.get_value_set_commands()
+        command_name = f"pm{requested_mode}"
+        
+        return value_set_commands.get(command_name)
+    
     def _get_status_commands_of_interest(
         self,
         all_commands_raw_data: AllOmnirigCommandsRawData,
