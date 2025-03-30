@@ -1,36 +1,33 @@
 import asyncio
 import time
 import os
+from application.icom_bt_connection_manager import IcomBTConnectionManager
 from application.config_manager import ConfigManager
 from application.constants import (
     DEFAULT_DEVICE_NAME,
     CFG_KEY_RADIO_DRIVER_NAME,
     CFG_KEY_WIFI_NAME,
-    CFG_KEY_RADIO_BAUD_RATE,
-    CFG_KEY_RADIO_DATA_BITS,
-    CFG_KEY_RADIO_STOP_BITS,
-    CFG_KEY_RADIO_PARITY,
     RADIO_DRIVER_FILE_PATH,
     CFG_KEY_STARTUP_SCREEN_WAIT_TIME,
-    WIFI_CONNECTED_SCREEN_WAIT_TIME,
-    CFG_KEY_RADIO_UART_INVERT_RX,
-    CFG_KEY_RADIO_UART_INVERT_TX,
+    WIFI_CONNECTED_SCREEN_WAIT_TIME, CFG_KEY_RADIO_BLUETOOTH_NAME,
 )
 from application.setup_manager import SetupManager
 from application.wifi_manager import WifiManager
 from board_config import BoardConfig
 from helpers.display_helper import DisplayHelper
 from helpers.logger import Logger
-from machine import UART, Pin
+from machine import Pin
 
 from helpers.omnirig_helper import OmnirigHelper
 from helpers.status_led_helper import StatusLedHelper
 from lib.asyncio.broker import Broker
 from lib.omnirig import OmnirigCommandExecutor
+from tasks.bt_status_led_task import BTStatusLedTask
 from tasks.button_read_task import ButtonReadTask
 from tasks.display_status_task import DisplayStatusTask
 from tasks.api_server_task import ApiServerTask
 from tasks.garbage_collect_task import GarbageCollectTask
+from tasks.icom_bt_connection_task import IcomBTConnectionTask
 from tasks.rig_data_read_task import RigDataReadTask
 from tasks.wavelog_api_call_task import WavelogApiCallTask
 
@@ -43,7 +40,6 @@ class MainApp:
     def __init__(
         self,
         board_config: BoardConfig,
-        uart: UART,
         setup_button_pin: Pin,
         status_led_helper: StatusLedHelper,
         logger: Logger,
@@ -53,9 +49,9 @@ class MainApp:
         setup_manager: SetupManager,
         omnirig_helper: OmnirigHelper,
         omnirig_command_executor: OmnirigCommandExecutor,
+        bt_connection_manager: IcomBTConnectionManager,
     ):
         self._board_config = board_config
-        self._uart = uart
         self._setup_button_pin = setup_button_pin
         self._status_led_helper = status_led_helper
         self._logger = logger
@@ -65,6 +61,7 @@ class MainApp:
         self._setup_manager = setup_manager
         self._omnirig_helper = omnirig_helper
         self._omnirig_command_executor = omnirig_command_executor
+        self._bt_connection_manager = bt_connection_manager
         
         self._setup_button_short_press_event = asyncio.Event()
         self._setup_button_long_press_event = asyncio.Event()
@@ -197,6 +194,24 @@ class MainApp:
         asyncio.create_task(websocket_client_task.run_trx_status_messages_subscriber())
         self._tasks_to_stop_when_setup_is_launched.append(websocket_client_task)
         
+        self._logger.debug("Starting Icom bluetooth connection task")
+        icom_bt_connection_task = IcomBTConnectionTask(
+            bt_connection_manager=self._bt_connection_manager,
+            config_manager=self._config_manager,
+            logger=self._logger,
+        )
+        asyncio.create_task(icom_bt_connection_task.run())
+        self._tasks_to_stop_when_setup_is_launched.append(icom_bt_connection_task)
+        
+        self._logger.debug("Starting bluetooth status LED task")
+        bt_status_led_task = BTStatusLedTask(
+            status_led_helper=self._status_led_helper,
+            bt_connection_manager=self._bt_connection_manager,
+            logger=self._logger,
+        )
+        asyncio.create_task(bt_status_led_task.run())
+        self._tasks_to_stop_when_setup_is_launched.append(bt_status_led_task)
+        
         asyncio.get_event_loop().run_forever()
         
     async def _wait_for_setup_button_short_press_event(
@@ -273,8 +288,6 @@ class MainApp:
         
         self._logger.info("Setting up wi-fi")
         self._wifi_manager.setup_wifi_as_client()
-        self._logger.info("Setting up UART")
-        self._configure_uart(config=config)
     
     def _radio_driver_is_missing(self, config_manager: ConfigManager) -> bool:
         """
@@ -297,51 +310,7 @@ class MainApp:
             "radio driver",
         ]
         self._display.display_text(text_rows)
-        
-    def _configure_uart(self, config: dict):
-        """
-        Configure UART interface for communication with transceiver with values from config
-        """
-        uart_baudrate = int(config.get(CFG_KEY_RADIO_BAUD_RATE))
-        uart_bits = int(config.get(CFG_KEY_RADIO_DATA_BITS))
-        uart_stop_bits = int(config.get(CFG_KEY_RADIO_STOP_BITS))
-        uart_parity = config.get(CFG_KEY_RADIO_PARITY)
-        
-        if uart_parity == 'odd':
-            parity = 1
-            parity_str = 'O'
-        elif uart_parity == 'even':
-            parity = 0
-            parity_str = 'E'
-        else:
-            parity = None
-            parity_str = 'N'
-            
-        uart_should_invert_rx = config.get(CFG_KEY_RADIO_UART_INVERT_RX) == "yes"
-        uart_should_invert_tx = config.get(CFG_KEY_RADIO_UART_INVERT_TX) == "yes"
-        
-        if uart_should_invert_rx and uart_should_invert_tx:
-            inversion_config = UART.INV_TX | UART.INV_RX
-        elif uart_should_invert_rx:
-            inversion_config = UART.INV_RX
-        elif uart_should_invert_tx:
-            inversion_config = UART.INV_TX
-        else:
-            inversion_config = 0  # no inversion
-        
-        self._uart.init(
-            baudrate=uart_baudrate,
-            bits=uart_bits,
-            parity=parity,
-            stop=uart_stop_bits,
-            tx=self._board_config.uart_tx_pin,
-            rx=self._board_config.uart_rx_pin,
-            invert=inversion_config,
-        )
-        self._logger.debug(
-            f"UART for TRX communication configured with values from config: "
-            f"{uart_baudrate}-{uart_bits}-{parity_str}-{uart_stop_bits}"
-        )
+
     
     def _display_splash_screen(self, config_manager: ConfigManager):
         """
@@ -350,23 +319,13 @@ class MainApp:
         config = config_manager.get_config()
         device_id = config_manager.get_device_id()
         
-        uart_baudrate = int(config.get(CFG_KEY_RADIO_BAUD_RATE))
-        uart_bits = int(config.get(CFG_KEY_RADIO_DATA_BITS))
-        uart_stop_bits = int(config.get(CFG_KEY_RADIO_STOP_BITS))
-        uart_parity = config.get(CFG_KEY_RADIO_PARITY)
-        
-        if uart_parity == 'odd':
-            parity = 'O'
-        elif uart_parity == 'even':
-            parity = 'E'
-        else:
-            parity = 'N'
+        radio_bluetooth_name = config.get(CFG_KEY_RADIO_BLUETOOTH_NAME)
         
         text_rows = [
             device_id,
             "",
             f"Radio: {config.get(CFG_KEY_RADIO_DRIVER_NAME)}",
             f"Wifi: {config.get(CFG_KEY_WIFI_NAME)}",
-            f"UART: {uart_baudrate}-{uart_bits}{parity}{uart_stop_bits}",
+            f"Radio BT name: {radio_bluetooth_name}",
         ]
         self._display.display_text(text_rows)

@@ -10,9 +10,6 @@ from application.constants import (
     CFG_KEY_WAVELOG_API_CALL_TIMEOUT,
     RADIO_DRIVER_FILE_PATH,
     CFG_KEY_RADIO_POLLING_INTERVAL,
-    CFG_KEY_RADIO_PARITY,
-    CFG_KEY_RADIO_UART_INVERT_RX,
-    CFG_KEY_RADIO_UART_INVERT_TX,
 )
 from application.config_manager import ConfigManager
 from helpers.display_helper import DisplayHelper
@@ -116,43 +113,6 @@ class SetupManager:
         # replace variable placeholders in setup html file with actual config values
         for key, val in config.items():
             setup_html = setup_html.replace(f"{{{{{key}}}}}", str(val))
-            
-        # handle pre-selection in uart parity selectbox
-        uart_parity = config.get(CFG_KEY_RADIO_PARITY)
-        if uart_parity == "no":
-            setup_html = setup_html.replace("{{noParitySelectedPlaceholder}}", "selected")
-            setup_html = setup_html.replace("{{oddParitySelectedPlaceholder}}", "")
-            setup_html = setup_html.replace("{{evenParitySelectedPlaceholder}}", "")
-        elif uart_parity == "odd":
-            setup_html = setup_html.replace("{{noParitySelectedPlaceholder}}", "")
-            setup_html = setup_html.replace("{{oddParitySelectedPlaceholder}}", "selected")
-            setup_html = setup_html.replace("{{evenParitySelectedPlaceholder}}", "")
-        elif uart_parity == "even":
-            setup_html = setup_html.replace("{{noParitySelectedPlaceholder}}", "")
-            setup_html = setup_html.replace("{{oddParitySelectedPlaceholder}}", "")
-            setup_html = setup_html.replace("{{evenParitySelectedPlaceholder}}", "selected")
-        else:
-            setup_html = setup_html.replace("{{noParitySelectedPlaceholder}}", "")
-            setup_html = setup_html.replace("{{oddParitySelectedPlaceholder}}", "")
-            setup_html = setup_html.replace("{{evenParitySelectedPlaceholder}}", "")
-            
-        # handle pre-selection in uart invert RX line selectbox
-        invert_uart_rx = config.get(CFG_KEY_RADIO_UART_INVERT_RX)
-        if invert_uart_rx == "no":
-            setup_html = setup_html.replace("{{doNotInvertRxPlaceholder}}", "selected")
-            setup_html = setup_html.replace("{{invertRxPlaceholder}}", "")
-        else:
-            setup_html = setup_html.replace("{{doNotInvertRxPlaceholder}}", "")
-            setup_html = setup_html.replace("{{invertRxPlaceholder}}", "selected")
-            
-        # handle pre-selection in uart invert TX line selectbox
-        invert_uart_tx = config.get(CFG_KEY_RADIO_UART_INVERT_TX)
-        if invert_uart_tx == "no":
-            setup_html = setup_html.replace("{{doNotInvertTxPlaceholder}}", "selected")
-            setup_html = setup_html.replace("{{invertTxPlaceholder}}", "")
-        else:
-            setup_html = setup_html.replace("{{doNotInvertTxPlaceholder}}", "")
-            setup_html = setup_html.replace("{{invertTxPlaceholder}}", "selected")
         
         await response.send(setup_html)
         

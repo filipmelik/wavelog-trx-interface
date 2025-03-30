@@ -1,15 +1,16 @@
 import asyncio
+from application.icom_bt_connection_manager import IcomBTConnectionManager
 from application.config_manager import ConfigManager
 from application.constants import DEFAULT_DEVICE_NAME
 from application.main_app import MainApp
 from application.wifi_manager import WifiManager
 from board_config import BoardConfig
+from helpers.icom_bt_serial_interface import IcomBTSerialInterface
 from helpers.display_helper import DisplayHelper
 from helpers.omnirig_helper import OmnirigHelper
 from application.setup_manager import SetupManager
 from helpers.logger import Logger
 from helpers.status_led_helper import StatusLedHelper
-from helpers.uart_serial_interface import UARTSerialInterface
 from lib.omnirig import OmnirigCommandExecutor, OmnirigValueDecoder, OmnirigValueEncoder
 
 
@@ -50,6 +51,13 @@ async def main():
         config_manager=config_manager,
         status_led_helper=status_led_helper,
     )
+    
+    icom_bt_connection_manager = IcomBTConnectionManager(logger=logger)
+    serial_interface = IcomBTSerialInterface(
+        icom_bt_connection_manager=icom_bt_connection_manager,
+        logger=logger,
+    )
+    
     omnirig_command_executor = OmnirigCommandExecutor(
         value_decoder=OmnirigValueDecoder(),
         value_encoder=OmnirigValueEncoder(),
@@ -63,7 +71,6 @@ async def main():
         logger.info("Starting up main application")
         main_app = MainApp(
             board_config=board_config,
-            uart=board_config.uart,
             setup_button_pin=board_config.setup_button_pin,
             status_led_helper=status_led_helper,
             logger=logger,
@@ -73,6 +80,7 @@ async def main():
             setup_manager=setup_manager,
             omnirig_helper=omnirig_helper,
             omnirig_command_executor=omnirig_command_executor,
+            bt_connection_manager=icom_bt_connection_manager,
         )
         await main_app.run()
     else:

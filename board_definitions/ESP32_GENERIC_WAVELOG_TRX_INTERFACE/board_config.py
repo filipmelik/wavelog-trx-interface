@@ -1,5 +1,5 @@
 from helpers.logger import Logger
-from machine import UART, Pin, SoftI2C
+from machine import Pin, SoftI2C
 from neopixel import NeoPixel
 from lib import ssd1306
 
@@ -8,12 +8,6 @@ SETUP BUTTON - REQUIRED
 The pin number on ESP32 where the 'setup button' is connected
 """
 SETUP_BUTTON_PIN_NUMBER = 0
-
-"""
-BOARD UART PORT - REQUIRED
-The ordinal number of UART interface of the ESP32 module
-"""
-UART_PORT_NUMBER = 2
 
 """
 OLED DISPLAY - OPTIONAL, but highly recommended
@@ -47,7 +41,6 @@ class BoardConfig:
         self.log_level = LOG_LEVEL
         
         self.setup_button_pin = Pin(SETUP_BUTTON_PIN_NUMBER, Pin.IN, Pin.PULL_UP)
-        self.uart = UART(UART_PORT_NUMBER)
         
         if not OLED_DISPLAY_I2C_SDA_PIN_NUMBER or not OLED_DISPLAY_I2C_SCL_PIN_NUMBER:
             self.oled_display = None
