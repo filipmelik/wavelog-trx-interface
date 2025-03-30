@@ -11,6 +11,8 @@ from application.constants import (
     RADIO_DRIVER_FILE_PATH,
     CFG_KEY_RADIO_POLLING_INTERVAL,
     CFG_KEY_RADIO_PARITY,
+    CFG_KEY_RADIO_UART_INVERT_RX,
+    CFG_KEY_RADIO_UART_INVERT_TX,
 )
 from application.config_manager import ConfigManager
 from helpers.display_helper import DisplayHelper
@@ -133,6 +135,24 @@ class SetupManager:
             setup_html = setup_html.replace("{{noParitySelectedPlaceholder}}", "")
             setup_html = setup_html.replace("{{oddParitySelectedPlaceholder}}", "")
             setup_html = setup_html.replace("{{evenParitySelectedPlaceholder}}", "")
+            
+        # handle pre-selection in uart invert RX line selectbox
+        invert_uart_rx = config.get(CFG_KEY_RADIO_UART_INVERT_RX)
+        if invert_uart_rx == "no":
+            setup_html = setup_html.replace("{{doNotInvertRxPlaceholder}}", "selected")
+            setup_html = setup_html.replace("{{invertRxPlaceholder}}", "")
+        else:
+            setup_html = setup_html.replace("{{doNotInvertRxPlaceholder}}", "")
+            setup_html = setup_html.replace("{{invertRxPlaceholder}}", "selected")
+            
+        # handle pre-selection in uart invert TX line selectbox
+        invert_uart_tx = config.get(CFG_KEY_RADIO_UART_INVERT_TX)
+        if invert_uart_tx == "no":
+            setup_html = setup_html.replace("{{doNotInvertTxPlaceholder}}", "selected")
+            setup_html = setup_html.replace("{{invertTxPlaceholder}}", "")
+        else:
+            setup_html = setup_html.replace("{{doNotInvertTxPlaceholder}}", "")
+            setup_html = setup_html.replace("{{invertTxPlaceholder}}", "selected")
         
         await response.send(setup_html)
         

@@ -52,6 +52,16 @@ hr { margin-bottom: 1.5em; }
             </select><br>
             <label for="radioStopBits">Radio UART stop bits:</label><br>
             <input type="number" id="radioStopBits" name="radioStopBits" value="{{radioStopBits}}" required><br>
+            <label for="radioUartInvertRx">Invert RX data line:</label><br>
+            <select id="radioUartInvertRx" name="radioUartInvertRx">
+                <option value="no" {{doNotInvertRxPlaceholder}}>No</option>
+                <option value="yes" {{invertRxPlaceholder}}>Yes</option>
+            </select><br>
+            <label for="radioUartInvertTx">Invert TX data line:</label><br>
+            <select id="radioUartInvertTx" name="radioUartInvertTx">
+                <option value="no" {{doNotInvertTxPlaceholder}}>No</option>
+                <option value="yes" {{invertTxPlaceholder}}>Yes</option>
+            </select><br>
             <hr>
             <label for="radioPollingInterval">Radio polling interval [seconds]:</label><br>
             <input type="number" step="any" id="radioPollingInterval" name="radioPollingInterval" value="{{radioPollingInterval}}" required><br>

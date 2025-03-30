@@ -11,7 +11,10 @@ from application.constants import (
     CFG_KEY_RADIO_STOP_BITS,
     CFG_KEY_RADIO_PARITY,
     RADIO_DRIVER_FILE_PATH,
-    CFG_KEY_STARTUP_SCREEN_WAIT_TIME, WIFI_CONNECTED_SCREEN_WAIT_TIME,
+    CFG_KEY_STARTUP_SCREEN_WAIT_TIME,
+    WIFI_CONNECTED_SCREEN_WAIT_TIME,
+    CFG_KEY_RADIO_UART_INVERT_RX,
+    CFG_KEY_RADIO_UART_INVERT_TX,
 )
 from application.setup_manager import SetupManager
 from application.wifi_manager import WifiManager
@@ -313,6 +316,18 @@ class MainApp:
         else:
             parity = None
             parity_str = 'N'
+            
+        uart_should_invert_rx = config.get(CFG_KEY_RADIO_UART_INVERT_RX) == "yes"
+        uart_should_invert_tx = config.get(CFG_KEY_RADIO_UART_INVERT_TX) == "yes"
+        
+        if uart_should_invert_rx and uart_should_invert_tx:
+            inversion_config = UART.INV_TX | UART.INV_RX
+        elif uart_should_invert_rx:
+            inversion_config = UART.INV_RX
+        elif uart_should_invert_tx:
+            inversion_config = UART.INV_TX
+        else:
+            inversion_config = 0  # no inversion
         
         self._uart.init(
             baudrate=uart_baudrate,
@@ -321,8 +336,7 @@ class MainApp:
             stop=uart_stop_bits,
             tx=self._board_config.uart_tx_pin,
             rx=self._board_config.uart_rx_pin,
-            # todo make this configurable in setup html
-            # invert=UART.INV_TX | UART.INV_RX,
+            invert=inversion_config,
         )
         self._logger.debug(
             f"UART for TRX communication configured with values from config: "

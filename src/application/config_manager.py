@@ -21,6 +21,8 @@ from application.constants import (
     CFG_KEY_XML_RPC_SERVER_PORT,
     CFG_KEY_GENERAL_API_SERVER_PORT,
     CFG_KEY_WEBSOCKET_SERVER_ENDPOINT_URL,
+    CFG_KEY_RADIO_UART_INVERT_RX,
+    CFG_KEY_RADIO_UART_INVERT_TX,
 )
 
 
@@ -53,6 +55,8 @@ class ConfigManager:
             CFG_KEY_RADIO_DATA_BITS: "8",
             CFG_KEY_RADIO_PARITY: "no",
             CFG_KEY_RADIO_STOP_BITS: "1",
+            CFG_KEY_RADIO_UART_INVERT_RX: "no",
+            CFG_KEY_RADIO_UART_INVERT_TX: "no",
             CFG_KEY_RADIO_DRIVER_NAME: "",
             CFG_KEY_RADIO_REPLY_TIMEOUT: "0.5",
             CFG_KEY_RADIO_POLLING_INTERVAL: "1",
