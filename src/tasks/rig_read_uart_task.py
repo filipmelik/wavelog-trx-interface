@@ -7,7 +7,6 @@ from application.constants import (
     TOPIC_TRX_STATUS,
 )
 from helpers.logger import Logger
-from machine import UART
 
 from helpers.omnirig_helper import OmnirigHelper
 from lib.asyncio.broker import Broker

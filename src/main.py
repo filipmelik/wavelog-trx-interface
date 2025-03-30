@@ -9,6 +9,7 @@ from helpers.omnirig_helper import OmnirigHelper
 from application.setup_manager import SetupManager
 from helpers.logger import Logger
 from helpers.status_led_helper import StatusLedHelper
+from helpers.uart_serial_interface import UARTSerialInterface
 from lib.omnirig import OmnirigCommandExecutor, OmnirigValueDecoder, OmnirigValueEncoder
 
 
@@ -52,7 +53,7 @@ async def main():
     omnirig_command_executor = OmnirigCommandExecutor(
         value_decoder=OmnirigValueDecoder(),
         value_encoder=OmnirigValueEncoder(),
-        uart=board_config.uart,
+        serial_interface=serial_interface,
         logger=logger,
     )
     

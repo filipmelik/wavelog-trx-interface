@@ -592,16 +592,18 @@ class OmnirigValueEncoder:
     
 class OmnirigCommandExecutor:
     
+    IN_PROGRESS_COMMAND_TIMEOUT_SECS = 3
+    
     def __init__(
         self,
         value_decoder: OmnirigValueDecoder,
         value_encoder: OmnirigValueEncoder,
-        uart,
+        serial_interface,
         logger = None
     ):
         self._value_decoder = value_decoder
         self._value_encoder = value_encoder
-        self._uart = uart
+        self._serial_interface = serial_interface
         self._logger = logger
         self._is_executing_command = False
     
@@ -621,7 +623,7 @@ class OmnirigCommandExecutor:
             cmd=cmd,
             value=None,
             reply_timeout_secs=reply_timeout_secs,
-            uart=self._uart
+            serial_interface=self._serial_interface
         )
         
         if not success:
@@ -682,7 +684,7 @@ class OmnirigCommandExecutor:
             cmd=cmd,
             value=value,
             reply_timeout_secs=reply_timeout_secs,
-            uart=self._uart
+            serial_interface=self._serial_interface
         )
         
         return success
@@ -692,22 +694,31 @@ class OmnirigCommandExecutor:
         cmd,
         value,
         reply_timeout_secs: float,
-        uart,
+        serial_interface,
     ) -> tuple:
         """
         Execute given command. Can be either READ or WRITE command.
         Returns tuple: (Success, TRX Reply data)
         """
+        start_time = time.time_ns()
         while self._is_executing_command:
             # if another command is being executed, wait until its execution finishes
             self._logger.debug(
                 "Another command is being executed, waiting for its completion..."
             )
-            await asyncio.sleep_ms(20)
+            elapsed_ns = time.time_ns() - start_time
+            if elapsed_ns > (self.IN_PROGRESS_COMMAND_TIMEOUT_SECS * 10 ** 9):
+                self._debug_log("Timeout waiting for another command execution to finish")
+                self._is_executing_command = False
+                break
+                
+            await asyncio.sleep_ms(50)
             
         self._is_executing_command = True
         
-        _ = uart.read()  # read and discard everything in UART buffer prior to sending command
+        # read and discard everything in serial interface buffer prior to sending command
+        # to have clean state
+        _ = serial_interface.flush_buffered_data()
         
         if cmd.command_type == OmnirigBaseCommand.COMMAND_TYPE_READ:
             # prepare READ command
@@ -750,9 +761,9 @@ class OmnirigCommandExecutor:
         
         self._debug_log(execute_debug_message)
         if cmd.command_data_type == OmnirigBaseCommand.DATA_TYPE_BIN:
-            uart.write(bytes.fromhex(command_to_execute))
+            await serial_interface.write(bytes.fromhex(command_to_execute))
         elif cmd.command_data_type == OmnirigBaseCommand.DATA_TYPE_TEXT:
-            uart.write(command_to_execute)
+            await serial_interface.write(command_to_execute)
         else:
             error_message = f"Unknown command data type: {cmd.command_data_type}"
             self._logger.exception(error_message)
@@ -770,7 +781,7 @@ class OmnirigCommandExecutor:
         trx_reply_buffer = bytearray()
         start_time = time.time_ns()
         while (reply_not_received and reply_timeout_not_reached):
-            chunk = uart.read()
+            chunk = serial_interface.read()
             if chunk:
                 trx_reply_buffer.extend(chunk)
             
