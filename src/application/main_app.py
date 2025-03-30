@@ -28,7 +28,7 @@ from tasks.button_read_task import ButtonReadTask
 from tasks.display_status_task import DisplayStatusTask
 from tasks.api_server_task import ApiServerTask
 from tasks.garbage_collect_task import GarbageCollectTask
-from tasks.rig_read_uart_task import RigReadUartTask
+from tasks.rig_data_read_task import RigDataReadTask
 from tasks.wavelog_api_call_task import WavelogApiCallTask
 
 from tasks.websocket_client_task import WebsocketClientTask
@@ -137,15 +137,15 @@ class MainApp:
         self._omnirig_helper.setup()
         
         self._logger.debug("Starting rig status UART reader task")
-        rig_read_uart_task = RigReadUartTask(
+        rig_data_read_task = RigDataReadTask(
             logger=self._logger,
             config_manager=self._config_manager,
             omnirig_helper=self._omnirig_helper,
             message_broker=self._message_broker,
             omnirig_command_executor=self._omnirig_command_executor,
         )
-        asyncio.create_task(rig_read_uart_task.run())
-        self._tasks_to_stop_when_setup_is_launched.append(rig_read_uart_task)
+        asyncio.create_task(rig_data_read_task.run())
+        self._tasks_to_stop_when_setup_is_launched.append(rig_data_read_task)
         
         self._logger.debug("Starting display status task")
         display_status_task = DisplayStatusTask(

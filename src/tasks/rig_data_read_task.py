@@ -16,7 +16,7 @@ from lib.omnirig import (
 )
 
 
-class RigReadUartTask:
+class RigDataReadTask:
     
     def __init__(
         self,
