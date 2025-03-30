@@ -139,7 +139,7 @@ class MainApp:
         self._logger.debug("Setting up TRX commands")
         self._omnirig_helper.setup()
         
-        self._logger.debug("Starting rig status UART reader task")
+        self._logger.debug("Starting rig data read task")
         rig_data_read_task = RigDataReadTask(
             logger=self._logger,
             config_manager=self._config_manager,
