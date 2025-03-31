@@ -13,15 +13,13 @@ from application.constants import (
     RADIO_DRIVER_FILE_PATH,
     CFG_KEY_STARTUP_SCREEN_WAIT_TIME,
     WIFI_CONNECTED_SCREEN_WAIT_TIME,
-    CFG_KEY_RADIO_UART_INVERT_RX,
-    CFG_KEY_RADIO_UART_INVERT_TX,
 )
 from application.setup_manager import SetupManager
 from application.wifi_manager import WifiManager
 from board_config import BoardConfig
 from helpers.display_helper import DisplayHelper
 from helpers.logger import Logger
-from machine import UART, Pin
+from machine import Pin
 
 from helpers.omnirig_helper import OmnirigHelper
 from helpers.status_led_helper import StatusLedHelper
@@ -43,7 +41,6 @@ class MainApp:
     def __init__(
         self,
         board_config: BoardConfig,
-        uart: UART,
         setup_button_pin: Pin,
         status_led_helper: StatusLedHelper,
         logger: Logger,
@@ -55,7 +52,6 @@ class MainApp:
         omnirig_command_executor: OmnirigCommandExecutor,
     ):
         self._board_config = board_config
-        self._uart = uart
         self._setup_button_pin = setup_button_pin
         self._status_led_helper = status_led_helper
         self._logger = logger
@@ -273,8 +269,6 @@ class MainApp:
         
         self._logger.info("Setting up wi-fi")
         self._wifi_manager.setup_wifi_as_client()
-        self._logger.info("Setting up UART")
-        self._configure_uart(config=config)
     
     def _radio_driver_is_missing(self, config_manager: ConfigManager) -> bool:
         """
@@ -297,51 +291,6 @@ class MainApp:
             "radio driver",
         ]
         self._display.display_text(text_rows)
-        
-    def _configure_uart(self, config: dict):
-        """
-        Configure UART interface for communication with transceiver with values from config
-        """
-        uart_baudrate = int(config.get(CFG_KEY_RADIO_BAUD_RATE))
-        uart_bits = int(config.get(CFG_KEY_RADIO_DATA_BITS))
-        uart_stop_bits = int(config.get(CFG_KEY_RADIO_STOP_BITS))
-        uart_parity = config.get(CFG_KEY_RADIO_PARITY)
-        
-        if uart_parity == 'odd':
-            parity = 1
-            parity_str = 'O'
-        elif uart_parity == 'even':
-            parity = 0
-            parity_str = 'E'
-        else:
-            parity = None
-            parity_str = 'N'
-            
-        uart_should_invert_rx = config.get(CFG_KEY_RADIO_UART_INVERT_RX) == "yes"
-        uart_should_invert_tx = config.get(CFG_KEY_RADIO_UART_INVERT_TX) == "yes"
-        
-        if uart_should_invert_rx and uart_should_invert_tx:
-            inversion_config = UART.INV_TX | UART.INV_RX
-        elif uart_should_invert_rx:
-            inversion_config = UART.INV_RX
-        elif uart_should_invert_tx:
-            inversion_config = UART.INV_TX
-        else:
-            inversion_config = 0  # no inversion
-        
-        self._uart.init(
-            baudrate=uart_baudrate,
-            bits=uart_bits,
-            parity=parity,
-            stop=uart_stop_bits,
-            tx=self._board_config.uart_tx_pin,
-            rx=self._board_config.uart_rx_pin,
-            invert=inversion_config,
-        )
-        self._logger.debug(
-            f"UART for TRX communication configured with values from config: "
-            f"{uart_baudrate}-{uart_bits}-{parity_str}-{uart_stop_bits}"
-        )
     
     def _display_splash_screen(self, config_manager: ConfigManager):
         """

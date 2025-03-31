@@ -50,6 +50,14 @@ async def main():
         config_manager=config_manager,
         status_led_helper=status_led_helper,
     )
+    serial_interface = UARTSerialInterface(
+        config_manager=config_manager,
+        board_config=board_config,
+        uart=board_config.uart,
+        logger=logger,
+    )
+    serial_interface.configure_uart()
+
     omnirig_command_executor = OmnirigCommandExecutor(
         value_decoder=OmnirigValueDecoder(),
         value_encoder=OmnirigValueEncoder(),
@@ -63,7 +71,6 @@ async def main():
         logger.info("Starting up main application")
         main_app = MainApp(
             board_config=board_config,
-            uart=board_config.uart,
             setup_button_pin=board_config.setup_button_pin,
             status_led_helper=status_led_helper,
             logger=logger,
