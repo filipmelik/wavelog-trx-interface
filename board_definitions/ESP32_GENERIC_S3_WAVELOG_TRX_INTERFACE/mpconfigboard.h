@@ -9,3 +9,7 @@
 
 #define MICROPY_HW_I2C0_SCL                 (9)
 #define MICROPY_HW_I2C0_SDA                 (8)
+
+// Enable software emulated double precision floats, as esp32 hw can handle only single
+// precision on its HW.
+#define MICROPY_FLOAT_IMPL                  (MICROPY_FLOAT_IMPL_DOUBLE)
