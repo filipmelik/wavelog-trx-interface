@@ -90,7 +90,7 @@ RUN git clone $MPY_CLONE_URL && \
 
 # Args defining repo of the project that contains application code to be baked in the created firmware
 ARG PROJECT_REPO_CLONE_URL=https://github.com/filipmelik/wavelog-trx-interface.git
-ARG PROJECT_REPO_CLONE_BRANCH_OR_TAG=main
+ARG PROJECT_REPO_CLONE_BRANCH_OR_TAG=icom-705-bluetooth
 
 # Clone the project files locally, cechkout selected branch and pull
 RUN git clone $PROJECT_REPO_CLONE_URL $PROJECT_PATH && \
