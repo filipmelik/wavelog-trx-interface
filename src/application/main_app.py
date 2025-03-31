@@ -9,7 +9,8 @@ from application.constants import (
     CFG_KEY_WIFI_NAME,
     RADIO_DRIVER_FILE_PATH,
     CFG_KEY_STARTUP_SCREEN_WAIT_TIME,
-    WIFI_CONNECTED_SCREEN_WAIT_TIME, CFG_KEY_RADIO_BLUETOOTH_NAME,
+    WIFI_CONNECTED_SCREEN_WAIT_TIME,
+    CFG_KEY_RADIO_BLUETOOTH_NAME,
 )
 from application.setup_manager import SetupManager
 from application.wifi_manager import WifiManager
