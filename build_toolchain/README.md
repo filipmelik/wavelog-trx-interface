@@ -18,6 +18,9 @@ of the built image:
 - `podman container cp ${container_id}:/micropython/ports/esp32/build-ESP32_GENERIC_S3_WAVELOG_TRX_INTERFACE-SPIRAM_OCT/firmware.bin ~/wl-trx-interface-firmware-s3-oct-spiram.bin`
 
 Now the firmware files are ready to be flashed to the ESP32 board using esptool/web based flash esp32 tool.
+You can optionally delete the container now:
+
+- `podman container rm ${container_id}`
 
 For example, when using esptool, erase the board first and then flash it like this:
 
