@@ -90,7 +90,7 @@ RUN git clone $MPY_CLONE_URL && \
 
 # Args defining repo of the project that contains application code to be baked in the created firmware
 ARG PROJECT_REPO_CLONE_URL=https://github.com/filipmelik/wavelog-trx-interface.git
-ARG PROJECT_REPO_CLONE_BRANCH_OR_TAG=generic_board_test
+ARG PROJECT_REPO_CLONE_BRANCH_OR_TAG=main
 
 # Clone the project files locally, cechkout selected branch and pull
 RUN git clone $PROJECT_REPO_CLONE_URL $PROJECT_PATH && \
@@ -106,8 +106,6 @@ RUN ~/myvenv/bin/pip install freezefs
 RUN chmod 700 -R $IDF_PATH
 RUN . $IDF_PATH/export.sh && \
     cd $MPY_PATH/ports/esp32 && \
-    mkdir boards/ESP32_GENERIC_WAVELOG_TRX_INTERFACE && \
-    cp -a $PROJECT_PATH/board_definitions/ESP32_GENERIC_WAVELOG_TRX_INTERFACE/. boards/ESP32_GENERIC_WAVELOG_TRX_INTERFACE/ && \
     mkdir boards/ESP32_GENERIC_S3_WAVELOG_TRX_INTERFACE && \
     cp -a $PROJECT_PATH/board_definitions/ESP32_GENERIC_S3_WAVELOG_TRX_INTERFACE/. boards/ESP32_GENERIC_S3_WAVELOG_TRX_INTERFACE/ && \
     rm -rf modules && \
@@ -118,8 +116,7 @@ RUN . $IDF_PATH/export.sh && \
     ~/myvenv/bin/python -m freezefs $PROJECT_PATH/src/setup_page frozen_setup_page_dir_bundle.py && \
     cd $MPY_PATH && make -C mpy-cross && \
     cd $MPY_PATH/ports/esp32 && make BOARD=ESP32_GENERIC submodules && \
-    make BOARD=ESP32_GENERIC_S3_WAVELOG_TRX_INTERFACE BOARD_VARIANT=SPIRAM_OCT && \
-    make BOARD=ESP32_GENERIC_WAVELOG_TRX_INTERFACE
+    make BOARD=ESP32_GENERIC_S3_WAVELOG_TRX_INTERFACE BOARD_VARIANT=SPIRAM_OCT
 
 # Set permissions for shared folders
 RUN chmod 777 /opt $MPY_PATH
