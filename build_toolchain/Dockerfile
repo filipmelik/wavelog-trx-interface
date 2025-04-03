@@ -102,6 +102,10 @@ RUN git clone $PROJECT_REPO_CLONE_URL $PROJECT_PATH && \
 RUN python3 -m venv ~/myvenv
 RUN ~/myvenv/bin/pip install freezefs
 
+# Turn on software-enabled double precision floats by replacing
+# the relevant constant in esp32 port's micropython config file
+RUN sed -i 's/MICROPY_FLOAT_IMPL_FLOAT/MICROPY_FLOAT_IMPL_DOUBLE/g' $MPY_PATH/ports/esp32/mpconfigport.h
+
 # Build
 RUN chmod 700 -R $IDF_PATH
 RUN . $IDF_PATH/export.sh && \
