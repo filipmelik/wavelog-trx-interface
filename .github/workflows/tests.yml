@@ -23,5 +23,7 @@ jobs:
       with:
         python-version: "3.10"
     - name: Tests
+      env:
+        TEST_DATA_DIR_BASE_PATH: "src/"
       run: |
         python src/tests.py
