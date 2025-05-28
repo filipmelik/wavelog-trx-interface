@@ -28,7 +28,6 @@ class WifiConnectionTask:
             
             # reconnect to wi-fi and intentionally block until reconnected
             self._logger.info("Reconnecting to Wi-fi")
-            self._wifi_manager.display_wifi_connecting_message()
             try:
                 await self._wifi_manager.connect_to_wifi_and_wait_until_connected(
                     blocking_wait_for_connect=True

@@ -116,7 +116,6 @@ class MainApp:
         # it also lets asyncio scheduler to handle the asyncio tasks called above this line
         # especially the button handler task, which allows us to enter setup in case it
         # is needed, for example to possibly correct the wi-fi username/password
-        self._wifi_manager.display_wifi_connecting_message()
         await self._wifi_manager.connect_to_wifi_and_wait_until_connected(
             blocking_wait_for_connect=False
         )

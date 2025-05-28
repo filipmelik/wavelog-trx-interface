@@ -1,3 +1,4 @@
+import os
 from lib.omnirig import OmnirigValueDecoder, OmnirigValueEncoder, OmnirigConfigParser, OmnirigStatusCommand
 
 # OmnirigValueDecoder tests
@@ -73,7 +74,8 @@ for test_data in value_encoder_test_data:
         
         
 # OmnirigStatusCommand tests
-filepath = 'test_data/command_with_multiple_same_named_flag_entries.ini'
+test_data_dir_base_path = os.environ.get('TEST_DATA_DIR_BASE_PATH', "")
+filepath = f'{test_data_dir_base_path}test_data/command_with_multiple_same_named_flag_entries.ini'
 parser = OmnirigConfigParser()
 commands_raw_data = parser.extract_all_commands_raw_data(filepath=filepath)
 cmd = OmnirigStatusCommand(

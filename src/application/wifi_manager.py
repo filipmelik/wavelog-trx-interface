@@ -1,16 +1,24 @@
 import asyncio
 
 import network
+import time
 
 from application.config_manager import ConfigManager
-from application.constants import CFG_KEY_WIFI_PASS, CFG_KEY_WIFI_NAME
+from application.constants import (
+    CFG_KEY_WIFI_PASS,
+    CFG_KEY_WIFI_NAME,
+    CFG_KEY_SECONDARY_WIFI_NAME,
+    CFG_KEY_SECONDARY_WIFI_PASS,
+    CFG_KEY_TERTIARY_WIFI_NAME,
+    CFG_KEY_TERTIARY_WIFI_PASS,
+)
 from helpers.display_helper import DisplayHelper
 from helpers.logger import Logger
 
 
 class WifiManager:
     
-    _wifi_station_interface: network.WLAN = None
+    WIFI_CONNECTION_TRY_TIMEOUT_SECS = 4
     
     def __init__(
         self, logger: Logger,
@@ -23,6 +31,8 @@ class WifiManager:
         
         self._wifi_access_point_interface = network.WLAN(network.WLAN.IF_AP)
         self._wifi_station_interface = network.WLAN(network.WLAN.IF_STA)
+        
+        self._wifi_list = self._prepare_wifi_list()
     
     
     def create_wifi_access_point(self, essid: str):
@@ -64,15 +74,17 @@ class WifiManager:
         """
         Connect to wi-fi saved in config and wait until connected
         """
-        self.disconnect_wifi()
-        
-        config = self._config_manager.get_config()
-        ssid = config[CFG_KEY_WIFI_NAME]
-        password = config[CFG_KEY_WIFI_PASS]
-        
-        self._logger.debug(f"Connecting to wi-fi '{ssid}'")
-        if not self._wifi_station_interface.isconnected():
+        i = 0
+        while not self._wifi_station_interface.isconnected():
+            wifi_index = i % len(self._wifi_list)
+            ssid = self._wifi_list[wifi_index]["ssid"]
+            password = self._wifi_list[wifi_index]["password"]
+            self._logger.debug(f"Connecting to wi-fi '{ssid}'")
+            self._display_wifi_connecting_message(ssid=ssid)
+            
+            self.disconnect_wifi()
             self._wifi_station_interface.connect(ssid, password)
+            start_time = time.time_ns()
             while not self._wifi_station_interface.isconnected():
                 if blocking_wait_for_connect:
                     # "forcibly" stay in the loop not giving asyncio
@@ -82,6 +94,12 @@ class WifiManager:
                     # stay in the loop until connected, but let scheduler
                     # chance to work on other running asyncio tasks
                     await asyncio.sleep_ms(100)
+                
+                elapsed_ns = time.time_ns() - start_time
+                if elapsed_ns > (self.WIFI_CONNECTION_TRY_TIMEOUT_SECS * 10 ** 9):
+                    self._logger.debug(f"Timeout waiting for connection to wi-fi '{ssid}'")
+                    i += 1  # move to next wi-fi in the list, if we have more than one
+                    break
                     
     
     def disconnect_wifi(self):
@@ -122,13 +140,10 @@ class WifiManager:
         """
         return self._wifi_station_interface.status("rssi")
     
-    def display_wifi_connecting_message(self):
+    def _display_wifi_connecting_message(self, ssid: str):
         """
         Display Wi-fi connecting message
         """
-        config = self._config_manager.get_config()
-        ssid = config[CFG_KEY_WIFI_NAME]
-        
         text_rows = [
             "No wifi",
             "",
@@ -148,3 +163,31 @@ class WifiManager:
             f"{self.get_device_ip_address()}"
         ]
         self._display.display_text(text_rows)
+        
+    def _prepare_wifi_list(self) -> list:
+        """
+        Prepare list of wi-fi networks where the device will try to connect
+        """
+        config = self._config_manager.get_config()
+        
+        primary_wifi_ssid = config[CFG_KEY_WIFI_NAME]
+        primary_wifi_password = config[CFG_KEY_WIFI_PASS]
+        secondary_wifi_ssid = config[CFG_KEY_SECONDARY_WIFI_NAME]
+        secondary_wifi_password = config[CFG_KEY_SECONDARY_WIFI_PASS]
+        tertiary_wifi_ssid = config[CFG_KEY_TERTIARY_WIFI_NAME]
+        tertiary_wifi_password = config[CFG_KEY_TERTIARY_WIFI_PASS]
+        
+        wifi_list = [
+            {"ssid": primary_wifi_ssid, "password": primary_wifi_password},
+        ]
+        
+        if secondary_wifi_ssid:
+            wifi_list.append(
+                {"ssid": secondary_wifi_ssid, "password": secondary_wifi_password},
+            )
+        if tertiary_wifi_ssid:
+            wifi_list.append(
+                {"ssid": tertiary_wifi_ssid, "password": tertiary_wifi_password},
+            )
+            
+        return wifi_list
