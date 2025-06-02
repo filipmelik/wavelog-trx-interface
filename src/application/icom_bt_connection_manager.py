@@ -17,9 +17,6 @@ class IcomBTConnectionManager:
         
     def set_device_connection(self, connection):
         self._connection = connection
-    
-    def reset_device_connection(self):
-        self._connection = None
         
     def get_icom_serial_characteristic(self):
         return self._icom_rx_tx_characteristic
@@ -27,13 +24,12 @@ class IcomBTConnectionManager:
     def set_icom_serial_characteristic(self, characteristic):
         self._icom_rx_tx_characteristic = characteristic
         
-    def reset_icom_serial_characteristic(self):
-        self._icom_rx_tx_characteristic = None
-        
     def set_icom_civ_access_granted(self):
         self._civ_access_granted = True
         
-    def reset_icom_civ_access_granted(self):
+    def reset_bt(self):
+        self._connection = None
+        self._icom_rx_tx_characteristic = None
         self._civ_access_granted = False
         
     def bt_is_ready(self) -> bool:
