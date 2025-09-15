@@ -1,5 +1,8 @@
 FROM ubuntu:24.04
 
+# workaround for https://stackoverflow.com/questions/63526272/release-file-is-not-valid-yet-docker
+RUN echo "Acquire::Check-Valid-Until \"false\";\nAcquire::Check-Date \"false\";" | cat > /etc/apt/apt.conf.d/10no--check-valid-until
+
 RUN apt update && \
     apt install -y --no-install-recommends \
     apt-utils \
@@ -101,6 +104,10 @@ RUN git clone $PROJECT_REPO_CLONE_URL $PROJECT_PATH && \
 # Create venv and install freezefs in there
 RUN python3 -m venv ~/myvenv
 RUN ~/myvenv/bin/pip install freezefs
+
+# Turn on software-enabled double precision floats by replacing
+# the relevant constant in esp32 port's micropython config file
+RUN sed -i 's/MICROPY_FLOAT_IMPL_FLOAT/MICROPY_FLOAT_IMPL_DOUBLE/g' $MPY_PATH/ports/esp32/mpconfigport.h
 
 # Build
 RUN chmod 700 -R $IDF_PATH
