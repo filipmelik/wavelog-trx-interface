@@ -59,9 +59,7 @@ class IcomBTConnectionTask:
                     self._logger.info(
                         f"Device of interest not found, will try again in a moment"
                     )
-                    self._bt_connection_manager.reset_device_connection()
-                    self._bt_connection_manager.reset_icom_serial_characteristic()
-                    self._bt_connection_manager.reset_icom_civ_access_granted()
+                    self._bt_connection_manager.reset_bt()
                     await asyncio.sleep_ms(1000)
                     continue
                 else:
@@ -72,13 +70,12 @@ class IcomBTConnectionTask:
                     self._logger.info("Connected to BT device")
                     self._bt_connection_manager.set_device_connection(connection=bt_connection)
             except Exception as e:
-                self._logger.debug(
+                self._logger.info(
                     f"Got error '{type(e)}: {str(e)}' when connecting to BT device, "
                     f"will try again in a moment",
                 )
-                self._bt_connection_manager.reset_device_connection()
-                self._bt_connection_manager.reset_icom_serial_characteristic()
-                self._bt_connection_manager.reset_icom_civ_access_granted()
+                self._bt_connection_manager.reset_bt()
+                await asyncio.sleep_ms(1000)
                 continue
             
             try:
@@ -106,9 +103,7 @@ class IcomBTConnectionTask:
                     f"or BT characteristic or when subscribing to notifications: "
                     f"'{type(e)}: {str(e)}'"
                 )
-                self._bt_connection_manager.reset_device_connection()
-                self._bt_connection_manager.reset_icom_serial_characteristic()
-                self._bt_connection_manager.reset_icom_civ_access_granted()
+                self._bt_connection_manager.reset_bt()
                 continue
                 
             self._logger.info(

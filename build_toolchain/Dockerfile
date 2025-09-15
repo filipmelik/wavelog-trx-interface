@@ -1,5 +1,8 @@
 FROM ubuntu:24.04
 
+# workaround for https://stackoverflow.com/questions/63526272/release-file-is-not-valid-yet-docker
+RUN echo "Acquire::Check-Valid-Until \"false\";\nAcquire::Check-Date \"false\";" | cat > /etc/apt/apt.conf.d/10no--check-valid-until
+
 RUN apt update && \
     apt install -y --no-install-recommends \
     apt-utils \
