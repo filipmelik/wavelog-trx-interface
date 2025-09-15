@@ -36,6 +36,14 @@ class IcomBTConnectionTask:
     async def run(self):
         while self._is_running:
             
+            if self._bt_connection_manager.had_too_many_consecutive_bt_errors():
+                self._logger.info(
+                    "Too many consecutive BT errors detected, resetting BT connection"
+                )
+                await self._bt_connection_manager.disconnect()
+                self._bt_connection_manager.reset_bt()
+                self._bt_connection_manager.reset_bt_error_counter()
+                
             if self._bt_connection_manager.bt_is_ready():
                 # we are connected and have a characteristic, nothing to do
                 self._logger.debug(

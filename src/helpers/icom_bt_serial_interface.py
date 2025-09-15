@@ -1,4 +1,5 @@
-from aioble.core import register_irq_handler
+from aioble.core import register_irq_handler, GattError
+
 from micropython import const
 
 from application.icom_bt_connection_manager import IcomBTConnectionManager
@@ -49,9 +50,16 @@ class IcomBTSerialInterface:
             self._logger.info("BT not connected/ready, skipping write")
             return
         
-        bt_characteristic = self._icom_bt_connection_manager.get_icom_serial_characteristic()
-        await bt_characteristic.write(data, response=True)
-        
+        try:
+            bt_characteristic = self._icom_bt_connection_manager.get_icom_serial_characteristic()
+            await bt_characteristic.write(data, response=True)
+            self._icom_bt_connection_manager.reset_bt_error_counter()
+        except GattError:
+            self._logger.debug("BT write error detected, incrementing BT error counter")
+            self._icom_bt_connection_manager.increment_bt_error_counter()
+        except TimeoutError:
+            self._logger.debug("BT timeout detected, incrementing BT error counter")
+            self._icom_bt_connection_manager.increment_bt_error_counter()
     
     def _bt_interrupt_request_handler(self, event, data):
         """
